@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EnerVision — Dashboard</title>
+    <!--
+      config.js définit window.APP_CONFIG.API_URL à partir de la variable
+      d'environnement API_URL du conteneur (voir docker/entrypoint.sh),
+      exactement comme le reçoit compose/dashboard.yml. En dev (npm run dev),
+      ce fichier n'existe pas : src/api/client.js retombe sur le proxy Vite.
+    -->
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
