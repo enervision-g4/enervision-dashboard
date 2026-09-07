@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 import { useAuth } from "@/composables/useAuth";
@@ -7,6 +8,7 @@ import { useAuth } from "@/composables/useAuth";
 const { login } = useAuth();
 const router = useRouter();
 const route = useRoute();
+const { t } = useI18n();
 
 const username = ref("");
 const password = ref("");
@@ -20,7 +22,7 @@ async function handleSubmit() {
     await login(username.value, password.value);
     router.push(route.query.redirect || "/");
   } catch {
-    error.value = "Identifiants invalides.";
+    error.value = t("login.invalid");
   } finally {
     loading.value = false;
   }
@@ -29,19 +31,19 @@ async function handleSubmit() {
 
 <template>
   <div class="app-shell login-shell">
-    <h1>EnerVision — Connexion</h1>
+    <h1>{{ t("login.title") }}</h1>
     <form @submit.prevent="handleSubmit">
       <label>
-        Utilisateur
+        {{ t("login.username") }}
         <input v-model="username" type="text" autocomplete="username" required />
       </label>
       <label>
-        Mot de passe
+        {{ t("login.password") }}
         <input v-model="password" type="password" autocomplete="current-password" required />
       </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="loading">
-        {{ loading ? "Connexion…" : "Se connecter" }}
+        {{ loading ? t("login.submitting") : t("login.submit") }}
       </button>
     </form>
   </div>

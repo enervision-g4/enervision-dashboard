@@ -46,4 +46,24 @@ apiClient.interceptors.response.use(
   },
 );
 
+/**
+ * Construit l'URL d'un WebSocket de l'API à partir de la même base que les
+ * appels REST (résolue par resolveApiBaseUrl), en convertissant http(s) en
+ * ws(s). Le token est ajouté en query string : un WebSocket natif ne peut
+ * pas poser de header Authorization (limitation des navigateurs).
+ */
+export function buildWsUrl(path, params = {}) {
+  const base = resolveApiBaseUrl();
+  const token = localStorage.getItem("enervision_token") || "";
+  const url = new URL(base === "/api-proxy" ? path.replace(/^\//, "/api-proxy/") : `${base}${path}`, window.location.origin);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("token", token);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, value);
+    }
+  });
+  return url.toString();
+}
+
 export default apiClient;

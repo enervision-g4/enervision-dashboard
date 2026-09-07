@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "Smart Energy Optimizer"
+  },
+  "nav": {
+    "home": "Accueil",
+    "sites": "Sites",
+    "alerts": "Alertes",
+    "predictions": "Prédictions",
+    "recommendations": "Recommandations"
+  },
+  "profile": {
+    "theme_light": "Mode clair",
+    "theme_dark": "Mode sombre",
+    "language": "Langue",
+    "logout": "Se déconnecter"
+  },
+  "common": {
+    "loading": "Chargement…",
+    "error_generic": "Impossible de charger les données depuis l'API.",
+    "back": "Retour",
+    "back_to_sites": "Retour aux sites",
+    "all": "Tous",
+    "all_severities": "Toutes",
+    "all_sites": "Tous les sites",
+    "from": "Depuis",
+    "to": "Jusqu'à",
+    "results": "résultats",
+    "page": "Page",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "per_page": "Par page",
+    "custom": "Autre…",
+    "auto": "Automatique",
+    "no_data": "Aucune donnée à afficher pour cette sélection.",
+    "reset_zoom": "Réinitialiser le zoom",
+    "coming_soon": "Bientôt disponible",
+    "coming_soon_detail": "Cette fonctionnalité est en cours de développement et arrivera prochainement."
+  },
+  "severity": {
+    "critical": "Critique",
+    "high": "Élevée",
+    "medium": "Moyenne",
+    "low": "Faible"
+  },
+  "status": {
+    "active": "Actif",
+    "inactive": "Inactif",
+    "maintenance": "Maintenance"
+  },
+  "site_type": {
+    "office": "Bureau",
+    "hospital": "Hôpital",
+    "datacenter": "Centre de données",
+    "retail": "Commerce",
+    "factory": "Usine"
+  },
+  "login": {
+    "title": "Smart Energy Optimizer - Connexion",
+    "username": "Utilisateur",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "submitting": "Connexion…",
+    "invalid": "Identifiants invalides."
+  },
+  "home": {
+    "title": "Vue d'ensemble",
+    "total_alerts": "Alertes au total",
+    "site": "Site",
+    "metric": "Mesure",
+    "metric_consumption": "Consommation (kW)",
+    "metric_voltage": "Tension (V)",
+    "metric_temperature": "Température (°C)",
+    "metric_humidity": "Humidité (%)",
+    "period": "Période"
+  },
+  "sites": {
+    "title": "Sites",
+    "capacity": "Capacité"
+  },
+  "site_detail": {
+    "consumption_chart": "Consommation",
+    "recent_alerts": "Alertes récentes",
+    "see_all_alerts": "Voir toutes les alertes de ce site"
+  },
+  "alerts": {
+    "title": "Alertes",
+    "severity": "Sévérité",
+    "site": "Site",
+    "message": "Message",
+    "timestamp": "Horodatage",
+    "none": "Aucune alerte pour ces filtres.",
+    "chart_title": "Alertes par sévérité",
+    "chart_scale": "Échelle de l'axe"
+  },
+  "coming_soon": {
+    "predictions_title": "Prédictions",
+    "recommendations_title": "Recommandations"
+  }
+}

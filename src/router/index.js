@@ -4,6 +4,8 @@ import { useAuth } from "@/composables/useAuth";
 import AlertsView from "@/views/AlertsView.vue";
 import HomeView from "@/views/HomeView.vue";
 import LoginView from "@/views/LoginView.vue";
+import PredictionsView from "@/views/PredictionsView.vue";
+import RecommendationsView from "@/views/RecommendationsView.vue";
 import SiteDetailView from "@/views/SiteDetailView.vue";
 import SitesListView from "@/views/SitesListView.vue";
 
@@ -15,6 +17,8 @@ const router = createRouter({
     { path: "/sites", name: "sites", component: SitesListView },
     { path: "/sites/:siteId", name: "site-detail", component: SiteDetailView, props: true },
     { path: "/alerts", name: "alerts", component: AlertsView, props: (route) => ({ ...route.query }) },
+    { path: "/predictions", name: "predictions", component: PredictionsView },
+    { path: "/recommendations", name: "recommendations", component: RecommendationsView },
   ],
 });
 

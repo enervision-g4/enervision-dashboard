@@ -24,7 +24,7 @@ describe("AlertList", () => {
   it("affiche le message et la sévérité de chaque alerte", () => {
     const wrapper = mount(AlertList, { props: { alerts: [alert] } });
 
-    expect(wrapper.text()).toContain("critical");
+    expect(wrapper.text()).toContain("Critique");
     expect(wrapper.text()).toContain("Risque de surcharge sur Usine Lyon Vénissieux");
     expect(wrapper.text()).toContain("SITE002");
   });
