@@ -65,10 +65,10 @@ a {
   color: var(--color-primary);
 }
 
-/* ---- Layout général : sidebar fixe + contenu ---- */
+/* ---- Layout général : sidebar fixe + topbar fixe + contenu qui scroll ---- */
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .app-shell {
@@ -81,14 +81,27 @@ a {
 .main-content {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Le scroll d'une page longue reste dans .main-scroll : la sidebar et la
+   topbar (thème/déconnexion via ProfileMenu) restent toujours visibles,
+   plutôt que de défiler avec le contenu. */
+.main-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .topbar {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.6rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
 }
@@ -97,17 +110,65 @@ a {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
+  height: 100vh;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
-  padding: 1.25rem 0.75rem;
+  padding: 1rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  transition: width 0.15s ease;
+}
+
+.sidebar--collapsed {
+  width: 68px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar--collapsed .sidebar-header {
+  flex-direction: column;
 }
 
 .sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-weight: 700;
-  padding: 0 0.5rem;
+  padding: 0 0.25rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.sidebar-brand__logo {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.sidebar-brand__name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-collapse-toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  border-radius: 6px;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
@@ -117,12 +178,22 @@ a {
 }
 
 .sidebar-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   color: var(--color-text);
   text-decoration: none;
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-link__icon {
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
 }
 
 .sidebar-link:hover {
@@ -132,13 +203,6 @@ a {
 .sidebar-link.router-link-exact-active {
   background: var(--color-primary);
   color: var(--color-primary-contrast);
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
 }
 
 /* ---- Cartes ---- */
@@ -177,22 +241,52 @@ a {
   text-transform: capitalize;
 }
 
+/* Palette alignée sur src/severity.js : critical=violet, high=rouge,
+   medium=orange, low=jaune — cohérent entre les tuiles d'accueil, ces
+   badges et le graphique en colonnes des alertes. */
 .badge--critical {
-  color: var(--color-critical);
-  background: var(--color-critical-bg);
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.14);
 }
 
-.badge--warning,
-.badge--high,
+.badge--high {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.14);
+}
+
 .badge--medium {
-  color: var(--color-warning);
-  background: var(--color-warning-bg);
+  color: #dd6b20;
+  background: rgba(221, 107, 32, 0.14);
 }
 
-.badge--low,
+.badge--low {
+  color: #d69e2e;
+  background: rgba(214, 158, 46, 0.16);
+}
+
 .badge--info {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+}
+
+.badge--type {
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+
+.badge--status-active {
   color: var(--color-low);
   background: var(--color-low-bg);
+}
+
+.badge--status-inactive {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+}
+
+.badge--status-maintenance {
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
 }
 
 /* ---- Boutons / contrôles ---- */
@@ -324,22 +418,33 @@ th.sortable:hover {
 .stat-tile__label {
   margin-top: 0.35rem;
   color: var(--color-text-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .chart-card {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 1.25rem;
   box-shadow: var(--shadow-card);
+  width: 100%;
 }
 
 .chart-controls {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.25rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.chart-controls .filter-field {
+  font-size: 0.95rem;
+}
+
+.time-range-selector button {
+  padding: 0.4rem 0.7rem;
 }
 
 .error {

@@ -27,10 +27,10 @@ describe("SiteCard", () => {
     const wrapper = mountCard({ site });
 
     expect(wrapper.text()).toContain("Bureau Paris La Défense");
-    expect(wrapper.text()).toContain("office");
+    expect(wrapper.text()).toContain("Bureau");
     expect(wrapper.text()).toContain("Paris, France");
     expect(wrapper.text()).toContain("200 kW");
-    expect(wrapper.text()).toContain("active");
+    expect(wrapper.text()).toContain("Actif");
   });
 
   it("pointe vers /sites/{site_id}", () => {

@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "Smart Energy Optimizer"
+  },
+  "nav": {
+    "home": "Inicio",
+    "sites": "Sitios",
+    "alerts": "Alertas",
+    "predictions": "Predicciones",
+    "recommendations": "Recomendaciones"
+  },
+  "profile": {
+    "theme_light": "Modo claro",
+    "theme_dark": "Modo oscuro",
+    "language": "Idioma",
+    "logout": "Cerrar sesión"
+  },
+  "common": {
+    "loading": "Cargando…",
+    "error_generic": "No se pudieron cargar los datos desde la API.",
+    "back": "Volver",
+    "back_to_sites": "Volver a los sitios",
+    "all": "Todas",
+    "all_severities": "Todas",
+    "all_sites": "Todos los sitios",
+    "from": "Desde",
+    "to": "Hasta",
+    "results": "resultados",
+    "page": "Página",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "per_page": "Por página",
+    "custom": "Otro…",
+    "auto": "Automático",
+    "no_data": "No hay datos para esta selección.",
+    "reset_zoom": "Restablecer zoom",
+    "coming_soon": "Próximamente",
+    "coming_soon_detail": "Esta función está en desarrollo y estará disponible próximamente."
+  },
+  "severity": {
+    "critical": "Crítica",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja"
+  },
+  "status": {
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "maintenance": "Mantenimiento"
+  },
+  "site_type": {
+    "office": "Oficina",
+    "hospital": "Hospital",
+    "datacenter": "Centro de datos",
+    "retail": "Comercio",
+    "factory": "Fábrica"
+  },
+  "login": {
+    "title": "Smart Energy Optimizer - Iniciar sesión",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "submit": "Iniciar sesión",
+    "submitting": "Iniciando sesión…",
+    "invalid": "Credenciales inválidas."
+  },
+  "home": {
+    "title": "Resumen",
+    "total_alerts": "Alertas totales",
+    "site": "Sitio",
+    "metric": "Medida",
+    "metric_consumption": "Consumo (kW)",
+    "metric_voltage": "Tensión (V)",
+    "metric_temperature": "Temperatura (°C)",
+    "metric_humidity": "Humedad (%)",
+    "period": "Período"
+  },
+  "sites": {
+    "title": "Sitios",
+    "capacity": "Capacidad"
+  },
+  "site_detail": {
+    "consumption_chart": "Consumo",
+    "recent_alerts": "Alertas recientes",
+    "see_all_alerts": "Ver todas las alertas de este sitio"
+  },
+  "alerts": {
+    "title": "Alertas",
+    "severity": "Severidad",
+    "site": "Sitio",
+    "message": "Mensaje",
+    "timestamp": "Fecha y hora",
+    "none": "No hay alertas para estos filtros.",
+    "chart_title": "Alertas por severidad",
+    "chart_scale": "Escala del eje"
+  },
+  "coming_soon": {
+    "predictions_title": "Predicciones",
+    "recommendations_title": "Recomendaciones"
+  }
+}

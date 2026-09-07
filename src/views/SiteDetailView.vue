@@ -1,39 +1,43 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { fetchAlerts } from "@/api/alerts";
 import { fetchReadings } from "@/api/readings";
 import { fetchSite } from "@/api/sites";
 import AlertList from "@/components/AlertList.vue";
 import MeasuresChart from "@/components/MeasuresChart.vue";
+import { useLiveSocket } from "@/composables/useLiveSocket";
 
-const REFRESH_INTERVAL_MS = 20_000;
 const RECENT_ALERTS_LIMIT = 5;
 
 const props = defineProps({
   siteId: { type: String, required: true },
 });
 
+const { t } = useI18n();
+
 const site = ref(null);
 const readings = ref([]);
 const recentAlerts = ref([]);
 const loading = ref(true);
 const loadError = ref("");
-let intervalId = null;
+let liveReadingsSocket = null;
+let liveAlertsSocket = null;
 
-const chartLabels = computed(() =>
-  readings.value.map((r) => new Date(r.timestamp).toLocaleString()),
-);
 const chartSeries = computed(() => [
-  { label: "Consommation (kW)", data: readings.value.map((r) => r.consumption_kw) },
+  {
+    label: t("site_detail.consumption_chart"),
+    data: readings.value.map((r) => ({ x: r.timestamp, y: r.consumption_kw })),
+  },
 ]);
 
-async function loadData({ silent = false } = {}) {
-  if (!silent) loading.value = true;
+async function loadData() {
+  loading.value = true;
   try {
     const [siteResult, readingsResult, alertsResult] = await Promise.all([
       fetchSite(props.siteId),
-      fetchReadings({ siteId: props.siteId, limit: 100 }),
+      fetchReadings({ siteId: props.siteId, limit: 500 }),
       fetchAlerts({ siteId: props.siteId, limit: RECENT_ALERTS_LIMIT }),
     ]);
     site.value = siteResult;
@@ -41,39 +45,76 @@ async function loadData({ silent = false } = {}) {
     recentAlerts.value = alertsResult.items;
     loadError.value = "";
   } catch {
-    loadError.value = "Impossible de charger ce site depuis l'API.";
+    loadError.value = t("common.error_generic");
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(() => {
-  loadData();
-  intervalId = setInterval(() => loadData({ silent: true }), REFRESH_INTERVAL_MS);
+// Nouvelles mesures poussées par le WebSocket : ajoutées à la série (patch
+// incrémental côté MeasuresChart), sans recharger toute la page.
+function connectLiveReadings() {
+  liveReadingsSocket?.close();
+  liveReadingsSocket = useLiveSocket("/ws/readings", { site_id: props.siteId }, (msg) => {
+    if (msg.type !== "reading" || msg.data.site_id !== props.siteId) return;
+    readings.value = [...readings.value, msg.data];
+  });
+}
+
+// Nouvelles alertes de ce site : ajoutées en tête de la liste "récentes",
+// tronquée à RECENT_ALERTS_LIMIT.
+function connectLiveAlerts() {
+  liveAlertsSocket?.close();
+  liveAlertsSocket = useLiveSocket("/ws/alerts", { site_id: props.siteId }, (msg) => {
+    if (msg.type !== "alert" || msg.data.site_id !== props.siteId) return;
+    recentAlerts.value = [msg.data, ...recentAlerts.value].slice(0, RECENT_ALERTS_LIMIT);
+  });
+}
+
+// Vue Router réutilise ce composant en naviguant d'une fiche site à l'autre
+// (même route) : sans ce watcher, les données du site précédent resteraient
+// affichées.
+watch(
+  () => props.siteId,
+  async () => {
+    await loadData();
+    connectLiveReadings();
+    connectLiveAlerts();
+  },
+);
+
+onMounted(async () => {
+  await loadData();
+  connectLiveReadings();
+  connectLiveAlerts();
 });
-onBeforeUnmount(() => clearInterval(intervalId));
+onBeforeUnmount(() => {
+  liveReadingsSocket?.close();
+  liveAlertsSocket?.close();
+});
 </script>
 
 <template>
   <main class="app-shell">
-    <RouterLink to="/sites">&larr; Retour aux sites</RouterLink>
+    <RouterLink to="/sites">&larr; {{ t("common.back_to_sites") }}</RouterLink>
 
-    <p v-if="loading">Chargement…</p>
+    <p v-if="loading">{{ t("common.loading") }}</p>
     <p v-else-if="loadError" class="error">{{ loadError }}</p>
 
     <template v-else>
       <h1>{{ site.site_name }}</h1>
       <p class="muted">
-        {{ site.site_type }} · {{ site.location }} · {{ site.capacity_kw }} kW · statut : {{ site.status }}
+        {{ t(`site_type.${site.site_type}`, site.site_type) }} · {{ site.location }} ·
+        {{ site.capacity_kw }} kW · {{ t(`status.${site.status}`, site.status) }}
       </p>
 
-      <MeasuresChart :labels="chartLabels" :series="chartSeries" y-label="Consommation (kW)" />
+      <MeasuresChart :series="chartSeries" :y-label="t('site_detail.consumption_chart')" :height="360" />
 
-      <h2>Alertes récentes</h2>
+      <h2>{{ t("site_detail.recent_alerts") }}</h2>
       <AlertList :alerts="recentAlerts" />
       <p>
         <RouterLink :to="{ path: '/alerts', query: { site_id: siteId } }">
-          Voir toutes les alertes de ce site &rarr;
+          {{ t("site_detail.see_all_alerts") }} &rarr;
         </RouterLink>
       </p>
     </template>
