@@ -1,8 +1,14 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
-import { fetchAlerts, fetchReadings, fetchSite } from "@/api/sites";
+import { fetchAlerts } from "@/api/alerts";
+import { fetchReadings } from "@/api/readings";
+import { fetchSite } from "@/api/sites";
 import AlertList from "@/components/AlertList.vue";
+import MeasuresChart from "@/components/MeasuresChart.vue";
+
+const REFRESH_INTERVAL_MS = 20_000;
+const RECENT_ALERTS_LIMIT = 5;
 
 const props = defineProps({
   siteId: { type: String, required: true },
@@ -10,22 +16,30 @@ const props = defineProps({
 
 const site = ref(null);
 const readings = ref([]);
-const alerts = ref([]);
+const recentAlerts = ref([]);
 const loading = ref(true);
 const loadError = ref("");
+let intervalId = null;
 
-async function loadData() {
-  loading.value = true;
-  loadError.value = "";
+const chartLabels = computed(() =>
+  readings.value.map((r) => new Date(r.timestamp).toLocaleString()),
+);
+const chartSeries = computed(() => [
+  { label: "Consommation (kW)", data: readings.value.map((r) => r.consumption_kw) },
+]);
+
+async function loadData({ silent = false } = {}) {
+  if (!silent) loading.value = true;
   try {
     const [siteResult, readingsResult, alertsResult] = await Promise.all([
       fetchSite(props.siteId),
-      fetchReadings({ siteId: props.siteId, limit: 50 }),
-      fetchAlerts({ siteId: props.siteId }),
+      fetchReadings({ siteId: props.siteId, limit: 100 }),
+      fetchAlerts({ siteId: props.siteId, limit: RECENT_ALERTS_LIMIT }),
     ]);
     site.value = siteResult;
     readings.value = readingsResult;
-    alerts.value = alertsResult;
+    recentAlerts.value = alertsResult.items;
+    loadError.value = "";
   } catch {
     loadError.value = "Impossible de charger ce site depuis l'API.";
   } finally {
@@ -33,55 +47,35 @@ async function loadData() {
   }
 }
 
-onMounted(loadData);
+onMounted(() => {
+  loadData();
+  intervalId = setInterval(() => loadData({ silent: true }), REFRESH_INTERVAL_MS);
+});
+onBeforeUnmount(() => clearInterval(intervalId));
 </script>
 
 <template>
   <main class="app-shell">
-    <RouterLink to="/">&larr; Retour</RouterLink>
+    <RouterLink to="/sites">&larr; Retour aux sites</RouterLink>
 
     <p v-if="loading">Chargement…</p>
     <p v-else-if="loadError" class="error">{{ loadError }}</p>
 
     <template v-else>
       <h1>{{ site.site_name }}</h1>
-      <p>{{ site.location }} — {{ site.capacity_kw }} kW — statut : {{ site.status }}</p>
+      <p class="muted">
+        {{ site.site_type }} · {{ site.location }} · {{ site.capacity_kw }} kW · statut : {{ site.status }}
+      </p>
 
-      <AlertList :alerts="alerts" />
+      <MeasuresChart :labels="chartLabels" :series="chartSeries" y-label="Consommation (kW)" />
 
-      <h2>Dernières mesures</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Horodatage</th>
-            <th>Consommation (kW)</th>
-            <th>Qualité</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="reading in readings" :key="reading.timestamp">
-            <td>{{ new Date(reading.timestamp).toLocaleString() }}</td>
-            <td>{{ reading.consumption_kw ?? "—" }}</td>
-            <td>{{ reading.data_quality ?? "—" }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <h2>Alertes récentes</h2>
+      <AlertList :alerts="recentAlerts" />
+      <p>
+        <RouterLink :to="{ path: '/alerts', query: { site_id: siteId } }">
+          Voir toutes les alertes de ce site &rarr;
+        </RouterLink>
+      </p>
     </template>
   </main>
 </template>
-
-<style scoped>
-.error {
-  color: #d33;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th,
-td {
-  text-align: left;
-  padding: 0.4rem;
-  border-bottom: 1px solid #eee;
-}
-</style>
