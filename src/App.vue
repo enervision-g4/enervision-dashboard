@@ -1,28 +1,16 @@
 <script setup>
 import { useAuth } from "@/composables/useAuth";
+import Sidebar from "@/components/Sidebar.vue";
 
-const { isAuthenticated, logout } = useAuth();
-
-function handleLogout() {
-  logout();
-  window.location.href = "/login";
-}
+const { isAuthenticated } = useAuth();
 </script>
 
 <template>
-  <header v-if="isAuthenticated" class="app-header">
-    <strong>EnerVision</strong>
-    <button @click="handleLogout">Se déconnecter</button>
-  </header>
-  <RouterView />
+  <div v-if="isAuthenticated" class="layout">
+    <Sidebar />
+    <div class="main-content">
+      <RouterView />
+    </div>
+  </div>
+  <RouterView v-else />
 </template>
-
-<style scoped>
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #ddd;
-}
-</style>
