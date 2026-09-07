@@ -12,14 +12,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
 
-      - run: npm install
+      # npm ci (pas npm install) : installe exactement ce que package-lock.json fige,
+      # échoue si package.json et le lock divergent — c'est ce qui garantit que le
+      # build est reproductible et identique à ce qui a été testé en local.
+      - run: npm ci
       - run: npm run test
 
   build-and-push:
@@ -29,7 +32,7 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
       stage: ${{ steps.meta.outputs.stage }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
