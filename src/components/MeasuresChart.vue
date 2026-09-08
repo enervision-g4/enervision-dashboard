@@ -10,6 +10,11 @@ import { useTheme } from "@/composables/useTheme";
 Chart.register(...registerables, zoomPlugin);
 
 const DEFAULT_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#fb4d63", "#8b5cf6"];
+// Opacité d'une courbe non survolée quand on met en avant sa voisine dans la
+// légende (ex. "Mesures" vs "Prévision" sur PredictionsView) — assez faible
+// pour rester clairement secondaire, sans disparaître complètement (on doit
+// pouvoir comparer les deux courbes, pas perdre l'une des deux de vue).
+const DIMMED_ALPHA = 0.18;
 
 const props = defineProps({
   // [{ label, color?, data: [{x: Date|string|number, y: number}] }]
@@ -21,6 +26,15 @@ const props = defineProps({
   // reste bloqué sur l'ancienne fenêtre visible et le sélecteur de période
   // semble sans effet.
   rangeKey: { type: String, default: "" },
+  // Bornes explicites de l'axe X (ISO ou ms epoch), appliquées à la
+  // (re)construction du graphique — voir shapeKey(). Sans elles, Chart.js
+  // cadre l'axe sur l'étendue réelle des points reçus, qui ne correspond pas
+  // forcément à la période demandée (ex. un léger retard d'ingestion, ou un
+  // graphique qui combine un historique de mesures et un horizon de
+  // prévision de largeurs différentes) : l'axe affiché semblait alors ne pas
+  // correspondre au sélecteur de période choisi.
+  xMin: { type: [String, Number], default: undefined },
+  xMax: { type: [String, Number], default: undefined },
 });
 
 // Émis (avec un léger anti-rebond) chaque fois que la fenêtre visible change
@@ -38,6 +52,10 @@ const visibleRange = ref("");
 let chartInstance = null;
 let lastShape = null;
 let rangeChangeTimer = null;
+// Couleur "pleine" de chaque dataset, dans l'ordre de props.series — utilisée
+// pour restaurer l'opacité normale au survol d'un autre élément de légende
+// (voir setEmphasis/clearEmphasis).
+let baseColors = [];
 
 function themeColors() {
   // Chart.js ne lit pas les variables CSS : on lui donne les couleurs du
@@ -62,24 +80,64 @@ function normalizeData(data) {
     .sort((a, b) => a.x - b.x);
 }
 
+/** "#rgb"/"#rrggbb" -> "rgba(r, g, b, alpha)". Toute autre forme (déjà rgba,
+ * nom de couleur CSS...) est renvoyée telle quelle : nos seules sources de
+ * couleur (DEFAULT_COLORS, series[].color) sont toujours de l'hexadécimal. */
+function withAlpha(color, alpha) {
+  const hex = color.startsWith("#") ? color.slice(1) : null;
+  if (!hex) return color;
+  const normalized = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
+  if (normalized.length !== 6 || Number.isNaN(Number.parseInt(normalized, 16))) return color;
+  const value = Number.parseInt(normalized, 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function buildDatasets() {
+  baseColors = props.series.map((s, i) => s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]);
   return props.series.map((s, i) => ({
     label: s.label,
     data: normalizeData(s.data),
-    borderColor: s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-    backgroundColor: s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+    borderColor: baseColors[i],
+    backgroundColor: baseColors[i],
     tension: 0.25,
     pointRadius: 2,
     spanGaps: true,
   }));
 }
 
+// Survol d'un élément de la légende (ex. "Mesures" ou "Prévision") : on met
+// sa courbe en avant en estompant les autres, plutôt que de les laisser
+// toutes à la même intensité — plus lisible dès que deux courbes se
+// chevauchent (mesures passées + prévision future sur le même graphique).
+function setEmphasis(activeIndex) {
+  if (!chartInstance) return;
+  chartInstance.data.datasets.forEach((dataset, i) => {
+    const color = i === activeIndex ? baseColors[i] : withAlpha(baseColors[i], DIMMED_ALPHA);
+    dataset.borderColor = color;
+    dataset.backgroundColor = color;
+  });
+  chartInstance.update("none");
+}
+
+function clearEmphasis() {
+  if (!chartInstance) return;
+  chartInstance.data.datasets.forEach((dataset, i) => {
+    dataset.borderColor = baseColors[i];
+    dataset.backgroundColor = baseColors[i];
+  });
+  chartInstance.update("none");
+}
+
 // Une "forme" différente (métrique/site changé, nombre de séries, libellé
-// d'axe) impose un vrai rebuild ; une série qui s'allonge simplement (un
-// nouveau point poussé par le WebSocket) ne fait que patcher les données en
-// place — c'est ce qui évite de reconstruire tout le graphique à chaque mesure.
+// d'axe, bornes explicites) impose un vrai rebuild ; une série qui s'allonge
+// simplement (un nouveau point poussé par le WebSocket) ne fait que patcher
+// les données en place — c'est ce qui évite de reconstruire tout le
+// graphique à chaque mesure.
 function shapeKey() {
-  return `${props.series.length}|${props.series.map((s) => s.label).join("~")}|${props.yLabel}`;
+  return `${props.series.length}|${props.series.map((s) => s.label).join("~")}|${props.yLabel}|${props.xMin}|${props.xMax}`;
 }
 
 /**
@@ -149,6 +207,11 @@ function buildChart() {
       scales: {
         x: {
           type: "time",
+          // Bornes explicites plutôt que laissées à l'étendue des données :
+          // voir le commentaire de la prop xMin/xMax. `undefined` laisse
+          // Chart.js déduire la borne de l'étendue réelle, comme avant.
+          min: props.xMin,
+          max: props.xMax,
           time: {
             tooltipFormat: "dd/MM/yyyy HH:mm",
             // Le jour complet est porté par le libellé au-dessus du graphique
@@ -174,7 +237,14 @@ function buildChart() {
         },
       },
       plugins: {
-        legend: { display: props.series.length > 1, labels: { color: colors.text } },
+        legend: {
+          display: props.series.length > 1,
+          labels: { color: colors.text },
+          // Survol d'un rectangle de légende : met sa courbe en avant et
+          // estompe les autres (voir setEmphasis) ; onLeave restaure tout.
+          onHover: (_event, legendItem) => setEmphasis(legendItem.datasetIndex),
+          onLeave: () => clearEmphasis(),
+        },
         zoom: {
           // Glisser sur le graphique fait défiler la période (pan), ça ne
           // zoome pas sur la zone surlignée : le zoom par rectangle de
@@ -234,8 +304,9 @@ onMounted(render);
 watch(() => props.series, render, { deep: true });
 watch(theme, buildChart);
 watch(locale, refreshVisibleRange);
-// Nouvelle période demandée : les données changent ET la fenêtre visible doit
-// repartir de zéro, sinon un zoom laissé actif masque la nouvelle plage.
+// Nouvelle période demandée (ou nouvelles bornes explicites, déjà incluses
+// dans shapeKey) : les données changent ET la fenêtre visible doit repartir
+// de zéro, sinon un zoom laissé actif masque la nouvelle plage.
 watch(
   () => props.rangeKey,
   () => {
@@ -243,6 +314,11 @@ watch(
     render();
   },
 );
+// Bornes explicites changées seules (sans que rangeKey bouge) : shapeKey()
+// les inclut déjà, render() route alors correctement vers buildChart() (et
+// donc de nouvelles bornes de zoom "maison") au lieu d'un simple patch qui
+// aurait laissé passer le changement inaperçu.
+watch(() => [props.xMin, props.xMax], render);
 onBeforeUnmount(() => {
   clearTimeout(rangeChangeTimer);
   chartInstance?.destroy();
@@ -256,7 +332,10 @@ onBeforeUnmount(() => {
       <span v-if="visibleRange" class="chart-period" :title="t('common.visible_period')">
         {{ visibleRange }}
       </span>
-      <button type="button" @click="resetZoom">{{ t("common.reset_zoom") }}</button>
+      <div class="chart-toolbar__end">
+        <slot name="badge" />
+        <button type="button" @click="resetZoom">{{ t("common.reset_zoom") }}</button>
+      </div>
     </div>
     <div class="chart-canvas-wrap" :style="{ height: `${height}px` }" :class="{ 'chart-canvas-wrap--empty': !hasData }">
       <canvas ref="canvasRef"></canvas>
@@ -272,6 +351,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.5rem;
+}
+.chart-toolbar__end {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 .chart-period {
   font-weight: 600;

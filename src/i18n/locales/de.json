@@ -106,11 +106,16 @@
     "title": "Verbrauchsvorhersagen",
     "site": "Standort",
     "history": "Angezeigter Verlauf",
+    "horizon": "Vorhersagehorizont",
     "measures_series": "Messwerte",
     "forecast_series": "Vorhersage",
     "generated_at": "Vorhersagen erstellt am {date}"
   },
-  "coming_soon": {
-    "recommendations_title": "Empfehlungen"
+  "recommendations": {
+    "title": "Empfehlungen",
+    "site": "Standort",
+    "status": "Status",
+    "status_open": "Offen",
+    "none": "Keine Empfehlungen für diese Filter."
   }
 }

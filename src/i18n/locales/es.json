@@ -106,11 +106,16 @@
     "title": "Predicciones de consumo",
     "site": "Sitio",
     "history": "Historial mostrado",
+    "horizon": "Horizonte de predicción",
     "measures_series": "Mediciones",
     "forecast_series": "Predicción",
     "generated_at": "Predicciones generadas el {date}"
   },
-  "coming_soon": {
-    "recommendations_title": "Recomendaciones"
+  "recommendations": {
+    "title": "Recomendaciones",
+    "site": "Sitio",
+    "status": "Estado",
+    "status_open": "Abierta",
+    "none": "No hay recomendaciones para estos filtros."
   }
 }

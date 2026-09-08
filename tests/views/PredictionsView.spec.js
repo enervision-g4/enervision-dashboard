@@ -40,10 +40,11 @@ const PREDICTIONS = [
 ];
 
 // MeasuresChart dessine sur un vrai <canvas> via Chart.js : hors de propos
-// ici, on vérifie seulement les séries qu'on lui transmet.
+// ici, on vérifie seulement les props qu'on lui transmet et le contenu du
+// slot #badge (le stub doit le rendre pour que wrapper.text() le voie).
 const MeasuresChartStub = {
-  props: ["series", "yLabel", "height", "rangeKey"],
-  template: "<div class='measures-chart-stub' />",
+  props: ["series", "yLabel", "height", "rangeKey", "xMin", "xMax"],
+  template: "<div class='measures-chart-stub'><slot name='badge' /></div>",
 };
 
 function mountView() {
@@ -60,12 +61,15 @@ describe("PredictionsView", () => {
     useLiveSocketMock.mockClear();
   });
 
-  it("charge les mesures et les prévisions du premier site au montage", async () => {
+  it("charge les mesures (fenêtre ancrée serveur) et les prévisions du premier site au montage", async () => {
     const wrapper = mountView();
     await flushPromises();
 
+    // rangeHours et non startTime : la fenêtre doit être calculée côté
+    // serveur, ancrée sur la donnée la plus récente en base (voir
+    // app/routers/readings.py) plutôt que sur l'horloge du navigateur.
     expect(fetchReadingsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ siteId: "SITE001", limit: 1000 }),
+      expect.objectContaining({ siteId: "SITE001", rangeHours: 24, limit: 1000 }),
     );
     expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 24 });
 
@@ -80,7 +84,7 @@ describe("PredictionsView", () => {
       },
       {
         label: "Prévision",
-        color: "#d33",
+        color: "#fb4d63",
         data: [
           { x: "2026-09-08T12:00:00Z", y: 65 },
           { x: "2026-09-08T13:00:00Z", y: 66 },
@@ -89,14 +93,46 @@ describe("PredictionsView", () => {
     ]);
   });
 
-  it("affiche la version du modèle et l'horodatage de génération du lot", async () => {
+  it("borne le graphique du début des mesures à la fin de l'horizon de prévision", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const chart = wrapper.findComponent(MeasuresChartStub);
+    expect(chart.props("xMin")).toBe(new Date(READINGS[0].timestamp).toISOString());
+    // La borne haute suit la dernière prévision, pas la dernière mesure :
+    // c'est bien plus tard que READINGS[1].timestamp.
+    expect(chart.props("xMax")).toBe(PREDICTIONS[1].target_timestamp);
+  });
+
+  it("affiche la version du modèle (badge) avec l'horodatage de génération en infobulle", async () => {
     const wrapper = mountView();
     await flushPromises();
 
     expect(wrapper.text()).toContain("scikit-learn==1.9.0+abc123");
+    const badge = wrapper.find(".badge--type");
+    expect(badge.exists()).toBe(true);
+    expect(badge.attributes("title")).toContain("11:05");
   });
 
-  it("recharge les prévisions du nouveau site quand on change de sélection", async () => {
+  it("recharge uniquement les prévisions quand on change l'horizon", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    fetchPredictionsMock.mockClear();
+    fetchReadingsMock.mockClear();
+
+    // TimeRangeSelector rend un groupe de boutons, pas un <select> — deux
+    // instances coexistent (historique de mesures, horizon de prévision), la
+    // seconde étant celle de l'horizon (voir l'ordre dans le template).
+    const horizonButtons = wrapper.findAll(".time-range-selector")[1].findAll("button");
+    const button48h = horizonButtons.find((b) => b.text() === "48h");
+    await button48h.trigger("click");
+    await flushPromises();
+
+    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 48 });
+    expect(fetchReadingsMock).not.toHaveBeenCalled();
+  });
+
+  it("recharge les mesures et les prévisions du nouveau site quand on change de sélection", async () => {
     fetchSitesMock.mockResolvedValue([
       SITE,
       { site_id: "SITE002", site_name: "Usine Lyon Vénissieux" },

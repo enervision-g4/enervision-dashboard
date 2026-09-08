@@ -8,6 +8,22 @@ const RANGES = [
 
 const props = defineProps({
   modelValue: { type: String, required: true },
+  // Permet de réutiliser ce même composant (bouton-groupe) pour un autre
+  // découpage que les périodes de mesures par défaut — ex. l'horizon de
+  // prévision de PredictionsView, qui n'a ni les mêmes clés ni les mêmes
+  // libellés. `label` est ce qui s'affiche sur le bouton ; `key`, la valeur
+  // émise. Par défaut : les périodes historiques habituelles (1h/6h/24h/7j).
+  options: {
+    type: Array,
+    // Ne référence pas RANGES : defineProps() est hissé hors du setup() par
+    // le compilateur, il ne peut pas fermer sur une variable du module.
+    default: () => [
+      { key: "1h", label: "1h" },
+      { key: "6h", label: "6h" },
+      { key: "24h", label: "24h" },
+      { key: "7d", label: "7d" },
+    ],
+  },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -21,13 +37,13 @@ defineExpose({ RANGES });
 <template>
   <div class="time-range-selector">
     <button
-      v-for="range in RANGES"
-      :key="range.key"
+      v-for="option in options"
+      :key="option.key"
       type="button"
-      :class="{ primary: modelValue === range.key }"
-      @click="select(range.key)"
+      :class="{ primary: modelValue === option.key }"
+      @click="select(option.key)"
     >
-      {{ range.key }}
+      {{ option.label }}
     </button>
   </div>
 </template>
