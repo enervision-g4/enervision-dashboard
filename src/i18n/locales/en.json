@@ -106,11 +106,16 @@
     "title": "Consumption predictions",
     "site": "Site",
     "history": "History shown",
+    "horizon": "Forecast horizon",
     "measures_series": "Measures",
     "forecast_series": "Forecast",
     "generated_at": "Forecast generated on {date}"
   },
-  "coming_soon": {
-    "recommendations_title": "Recommendations"
+  "recommendations": {
+    "title": "Recommendations",
+    "site": "Site",
+    "status": "Status",
+    "status_open": "Open",
+    "none": "No recommendations match these filters."
   }
 }

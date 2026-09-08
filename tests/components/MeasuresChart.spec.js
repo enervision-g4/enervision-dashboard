@@ -167,4 +167,69 @@ describe("MeasuresChart", () => {
       vi.useRealTimers();
     }
   });
+
+  it("applique xMin/xMax comme bornes explicites de l'axe des temps", async () => {
+    // Régression : sans bornes explicites, Chart.js cadrait l'axe sur
+    // l'étendue réelle des points reçus (qui peut être plus courte que la
+    // période demandée, ex. léger retard d'ingestion), donnant l'impression
+    // à tort que l'historique antérieur avait disparu.
+    mount(MeasuresChart, {
+      props: {
+        series: [{ label: "Consommation", data: [{ x: 1757325600000, y: 2 }] }],
+        xMin: "2026-09-08T00:00:00Z",
+        xMax: "2026-09-09T00:00:00Z",
+      },
+    });
+    await flushPromises();
+
+    const { min, max } = instances[0].config.options.scales.x;
+    expect(min).toBe("2026-09-08T00:00:00Z");
+    expect(max).toBe("2026-09-09T00:00:00Z");
+  });
+
+  it("reconstruit le graphique (et réinitialise le zoom) quand seules les bornes xMin/xMax changent", async () => {
+    // Une période/un horizon peut changer sans que le nombre ou le libellé
+    // des séries change (ex. PredictionsView : changer l'historique de
+    // mesures ne touche qu'aux bornes) — shapeKey() doit quand même détecter
+    // le changement, sinon l'ancien zoom/pan resterait affiché sur la
+    // nouvelle plage.
+    const wrapper = mount(MeasuresChart, {
+      props: {
+        series: [{ label: "Consommation", data: [{ x: 1757325600000, y: 2 }] }],
+        xMin: "2026-09-08T00:00:00Z",
+        xMax: "2026-09-09T00:00:00Z",
+      },
+    });
+    await flushPromises();
+    const firstInstanceCount = instances.length;
+
+    await wrapper.setProps({ xMin: "2026-09-01T00:00:00Z" });
+    await flushPromises();
+
+    expect(instances.length).toBeGreaterThan(firstInstanceCount);
+  });
+
+  it("survol d'un élément de légende : estompe les autres courbes, restaure tout au départ", async () => {
+    mount(MeasuresChart, {
+      props: {
+        series: [
+          { label: "Mesures", color: "#3b82f6", data: [{ x: 1757325600000, y: 2 }] },
+          { label: "Prévision", color: "#fb4d63", data: [{ x: 1757325600000, y: 3 }] },
+        ],
+      },
+    });
+    await flushPromises();
+
+    const chart = instances[0];
+    const legend = chart.config.options.plugins.legend;
+
+    legend.onHover(null, { datasetIndex: 1 });
+    expect(chart.data.datasets[1].borderColor).toBe("#fb4d63");
+    expect(chart.data.datasets[0].borderColor).not.toBe("#3b82f6");
+    expect(chart.data.datasets[0].borderColor).toMatch(/^rgba\(59, 130, 246, 0\.18\)$/);
+
+    legend.onLeave();
+    expect(chart.data.datasets[0].borderColor).toBe("#3b82f6");
+    expect(chart.data.datasets[1].borderColor).toBe("#fb4d63");
+  });
 });

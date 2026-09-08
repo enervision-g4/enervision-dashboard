@@ -419,6 +419,18 @@ a {
   background: var(--color-warning);
 }
 
+/* Recommandation "open" (voir RecommendationsView) : même famille de couleur
+   que badge--status-maintenance (une action reste à traiter), point de
+   couleur + texte neutre pour le même motif de contraste que les badges
+   ci-dessus. */
+.badge--open {
+  color: var(--color-text);
+  background: var(--color-warning-bg);
+}
+.badge--open::before {
+  background: var(--color-warning);
+}
+
 /* ---- Boutons / contrôles ---- */
 button,
 select,

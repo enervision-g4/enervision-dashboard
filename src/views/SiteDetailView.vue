@@ -58,6 +58,14 @@ let readingsToken = 0;
 let loadedStartMs = null;
 let loadedEndMs = null;
 
+// Bornes explicites transmises à MeasuresChart (voir sa prop xMin/xMax) :
+// contrairement à loadedStartMs/loadedEndMs (qui s'étendent au fil des
+// glissements pour savoir quoi recharger), celles-ci ne bougent qu'à chaque
+// chargement délibéré (changement de période) — c'est ce qui garantit que
+// l'axe affiché correspond exactement à la période choisie.
+const chartXMin = ref(undefined);
+const chartXMax = ref(undefined);
+
 const chartSeries = computed(() => [
   {
     label: t(METRICS.find((m) => m.key === selectedMetric.value)?.labelKey),
@@ -102,21 +110,23 @@ function windowParams() {
 }
 
 /** Mémorise la fenêtre effectivement couverte par `data` (voir
- * onChartRangeChange). À défaut de donnée, on retombe sur la fenêtre
- * demandée, pour ne pas la redemander en boucle. */
+ * onChartRangeChange) et fixe les bornes explicites du graphique
+ * (chartXMin/chartXMax) sur cette même fenêtre, pour que l'axe affiché
+ * corresponde à la période demandée dès le chargement. À défaut de donnée,
+ * on retombe sur la fenêtre demandée, pour ne pas la redemander en boucle. */
 function rememberLoadedBounds(data, params) {
   if (data.length) {
     loadedStartMs = new Date(data[0].timestamp).getTime();
     loadedEndMs = new Date(data[data.length - 1].timestamp).getTime();
-    return;
-  }
-  if (params.startTime && params.endTime) {
+  } else if (params.startTime && params.endTime) {
     loadedStartMs = new Date(params.startTime).getTime();
     loadedEndMs = new Date(params.endTime).getTime();
   } else {
     loadedEndMs = Date.now();
     loadedStartMs = loadedEndMs - (params.rangeHours ?? 24) * 60 * 60 * 1000;
   }
+  chartXMin.value = new Date(loadedStartMs).toISOString();
+  chartXMax.value = new Date(loadedEndMs).toISOString();
 }
 
 /** Fusionne de nouvelles lignes dans `readings` (dédoublonnées par
@@ -149,7 +159,8 @@ async function loadReadings() {
 // vide dès qu'on quittait la fenêtre initiale ("je n'ai pas de valeur
 // avant"). On étend alors le chargement d'un "écran" supplémentaire de
 // chaque côté qui en a besoin, sans jamais réinitialiser le zoom/pan en
-// cours (contrairement à un changement de période).
+// cours (contrairement à un changement de période) — ni chartXMin/chartXMax,
+// qui doivent rester ceux du dernier chargement délibéré.
 let extendingBefore = false;
 let extendingAfter = false;
 
@@ -347,7 +358,9 @@ onBeforeUnmount(() => {
       <MeasuresChart
         :series="chartSeries"
         :y-label="t(METRICS.find((m) => m.key === selectedMetric)?.labelKey)"
-        :range-key="`${siteId}|${windowKey}`"
+        :range-key="`${siteId}|${windowKey}|${chartXMin}|${chartXMax}`"
+        :x-min="chartXMin"
+        :x-max="chartXMax"
         :height="360"
         @range-change="onChartRangeChange"
       />
