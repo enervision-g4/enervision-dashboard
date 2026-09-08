@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   build-and-push:
-    needs: test
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
