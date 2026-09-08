@@ -35,12 +35,13 @@
     "previous": "Précédent",
     "next": "Suivant",
     "per_page": "Par page",
-    "custom": "Autre…",
     "auto": "Automatique",
     "no_data": "Aucune donnée à afficher pour cette sélection.",
     "reset_zoom": "Réinitialiser le zoom",
     "coming_soon": "Bientôt disponible",
-    "coming_soon_detail": "Cette fonctionnalité est en cours de développement et arrivera prochainement."
+    "coming_soon_detail": "Cette fonctionnalité est en cours de développement et arrivera prochainement.",
+    "reset_filters": "Réinitialiser les filtres",
+    "visible_period": "Période affichée"
   },
   "severity": {
     "critical": "Critique",
@@ -66,7 +67,10 @@
     "password": "Mot de passe",
     "submit": "Se connecter",
     "submitting": "Connexion…",
-    "invalid": "Identifiants invalides."
+    "invalid": "Identifiants invalides.",
+    "heading": "Connexion",
+    "subtitle": "Accédez au tableau de bord de vos sites.",
+    "tagline": "Pilotez la consommation énergétique de vos sites en temps réel."
   },
   "home": {
     "title": "Vue d'ensemble",

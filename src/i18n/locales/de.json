@@ -35,12 +35,13 @@
     "previous": "Zurück",
     "next": "Weiter",
     "per_page": "Pro Seite",
-    "custom": "Andere…",
     "auto": "Automatisch",
     "no_data": "Keine Daten für diese Auswahl.",
     "reset_zoom": "Zoom zurücksetzen",
     "coming_soon": "Demnächst verfügbar",
-    "coming_soon_detail": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein."
+    "coming_soon_detail": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein.",
+    "reset_filters": "Filter zurücksetzen",
+    "visible_period": "Angezeigter Zeitraum"
   },
   "severity": {
     "critical": "Kritisch",
@@ -66,7 +67,10 @@
     "password": "Passwort",
     "submit": "Anmelden",
     "submitting": "Anmeldung…",
-    "invalid": "Ungültige Anmeldedaten."
+    "invalid": "Ungültige Anmeldedaten.",
+    "heading": "Anmeldung",
+    "subtitle": "Zugang zum Dashboard Ihrer Standorte.",
+    "tagline": "Überwachen Sie den Energieverbrauch Ihrer Standorte in Echtzeit."
   },
   "home": {
     "title": "Übersicht",

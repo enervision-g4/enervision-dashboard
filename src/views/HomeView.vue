@@ -55,17 +55,30 @@ const totalAlerts = computed(() =>
   Object.values(alertsSummary.value).reduce((sum, count) => sum + count, 0),
 );
 
+// Jeton de requête : une réponse arrivée en retard (site ou période changés
+// entre-temps) ne doit pas écraser la série affichée.
+let readingsToken = 0;
+
 async function loadReadings() {
   if (!selectedSiteId.value) return;
+  const token = ++readingsToken;
   try {
-    readings.value = await fetchReadings({
+    const data = await fetchReadings({
       siteId: selectedSiteId.value,
       startTime: rangeStartTime(timeRange.value),
       limit: 1000,
     });
+    if (token !== readingsToken) return;
+    readings.value = data;
+    loadError.value = "";
   } catch {
-    loadError.value = t("common.error_generic");
+    if (token === readingsToken) loadError.value = t("common.error_generic");
   }
+}
+
+/** Mesure la plus récente déjà chargée : point de reprise du flux temps réel. */
+function newestReadingTimestamp() {
+  return readings.value.length ? readings.value[readings.value.length - 1].timestamp : undefined;
 }
 
 async function loadAlertsSummary() {
@@ -83,16 +96,27 @@ function connectLive() {
   liveSocket?.close();
   liveSocket = null;
   if (!selectedSiteId.value) return;
-  liveSocket = useLiveSocket("/ws/readings", { site_id: selectedSiteId.value }, (msg) => {
-    if (msg.type !== "reading" || msg.data.site_id !== selectedSiteId.value) return;
-    readings.value = [...readings.value, msg.data];
-  });
+  liveSocket = useLiveSocket(
+    "/ws/readings",
+    () => ({ site_id: selectedSiteId.value, since: newestReadingTimestamp() }),
+    (msg) => {
+      if (msg.type !== "reading" || msg.data.site_id !== selectedSiteId.value) return;
+      // La fenêtre affichée glisse avec le temps : on écarte au passage les
+      // points sortis de la période choisie, sinon la série grossit sans fin.
+      const floor = new Date(rangeStartTime(timeRange.value)).getTime();
+      readings.value = [...readings.value, msg.data].filter(
+        (reading) => new Date(reading.timestamp).getTime() >= floor,
+      );
+    },
+  );
 }
 
 watch(selectedSiteId, async () => {
   await loadReadings();
   connectLive();
 });
+// Nouvelle période : on recharge, et le graphique remet sa fenêtre visible à
+// plat (prop rangeKey) — un zoom laissé actif masquerait la nouvelle plage.
 watch(timeRange, loadReadings);
 
 onMounted(async () => {
@@ -171,6 +195,7 @@ onBeforeUnmount(() => {
         class="home-chart"
         :series="chartSeries"
         :y-label="t(METRICS.find((m) => m.key === selectedMetric)?.labelKey)"
+        :range-key="`${selectedSiteId}|${timeRange}`"
         :height="420"
       />
     </template>
