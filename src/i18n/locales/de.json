@@ -102,8 +102,15 @@
     "chart_title": "Warnungen nach Schweregrad",
     "chart_scale": "Achsenskala"
   },
+  "predictions": {
+    "title": "Verbrauchsvorhersagen",
+    "site": "Standort",
+    "history": "Angezeigter Verlauf",
+    "measures_series": "Messwerte",
+    "forecast_series": "Vorhersage",
+    "generated_at": "Vorhersagen erstellt am {date}"
+  },
   "coming_soon": {
-    "predictions_title": "Vorhersagen",
     "recommendations_title": "Empfehlungen"
   }
 }

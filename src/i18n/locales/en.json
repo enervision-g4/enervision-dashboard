@@ -102,8 +102,15 @@
     "chart_title": "Alerts by severity",
     "chart_scale": "Axis scale"
   },
+  "predictions": {
+    "title": "Consumption predictions",
+    "site": "Site",
+    "history": "History shown",
+    "measures_series": "Measures",
+    "forecast_series": "Forecast",
+    "generated_at": "Forecast generated on {date}"
+  },
   "coming_soon": {
-    "predictions_title": "Predictions",
     "recommendations_title": "Recommendations"
   }
 }
