@@ -2,7 +2,7 @@
 import { Chart, registerables } from "chart.js";
 import "chartjs-adapter-date-fns";
 import zoomPlugin from "chartjs-plugin-zoom";
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { useTheme } from "@/composables/useTheme";
@@ -185,6 +185,17 @@ function render() {
   }
 }
 
+// Un point existe (un x valide) mais sa valeur peut être `null` — capteur en
+// panne, `data_quality` dégradée (voir app_mock/API : les NULL ne sont jamais
+// filtrés, ils sont conservés tels quels). Compter les points ne suffit donc
+// pas à savoir si le graphique a quelque chose à montrer : sans ce contrôle
+// sur `y`, le site affichait un cadre vide (axe 0-1 par défaut) plutôt que le
+// message "aucune donnée", ce qui donnait l'impression à tort que rien n'avait
+// été chargé.
+const hasData = computed(() =>
+  props.series.some((s) => (s.data ?? []).some((point) => Number.isFinite(point.y))),
+);
+
 function resetZoom() {
   chartInstance?.resetZoom();
   refreshVisibleRange();
@@ -218,12 +229,10 @@ onBeforeUnmount(() => {
       </span>
       <button type="button" @click="resetZoom">{{ t("common.reset_zoom") }}</button>
     </div>
-    <div class="chart-canvas-wrap" :style="{ height: `${height}px` }">
+    <div class="chart-canvas-wrap" :style="{ height: `${height}px` }" :class="{ 'chart-canvas-wrap--empty': !hasData }">
       <canvas ref="canvasRef"></canvas>
+      <p v-if="!hasData" class="muted chart-empty-overlay">{{ t("common.no_data") }}</p>
     </div>
-    <p v-if="!series.length || !series.some((s) => s.data.length)" class="muted">
-      {{ t("common.no_data") }}
-    </p>
   </div>
 </template>
 
@@ -250,5 +259,23 @@ onBeforeUnmount(() => {
 .chart-canvas-wrap {
   position: relative;
   width: 100%;
+}
+
+/* Aucune valeur exploitable (mesure en panne, data_quality dégradée) : le
+   canevas Chart.js reste techniquement affiché (axe par défaut 0-1, sans
+   courbe) mais visuellement masqué au profit d'un message explicite, plutôt
+   que de laisser un cadre vide qui donne l'impression qu'aucune donnée n'a
+   été chargée. */
+.chart-canvas-wrap--empty canvas {
+  visibility: hidden;
+}
+
+.chart-empty-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
 }
 </style>

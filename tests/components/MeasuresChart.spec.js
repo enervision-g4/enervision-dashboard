@@ -85,4 +85,48 @@ describe("MeasuresChart", () => {
 
     expect(resetZoom).toHaveBeenCalled();
   });
+
+  it("affiche le message 'aucune donnée' quand tous les points sont à null", async () => {
+    // Régression : un capteur en panne (data_quality dégradée) fournit des
+    // points avec un horodatage valide mais une valeur `y` nulle. Compter les
+    // points ne suffit pas à savoir si le graphique a quelque chose à
+    // montrer — sans ce contrôle, le site affichait un cadre vide (axe 0-1)
+    // au lieu du message explicite, ce qui donnait l'impression à tort
+    // qu'aucune donnée n'avait été chargée pour ce site.
+    const wrapper = mount(MeasuresChart, {
+      props: {
+        series: [
+          {
+            label: "Consommation",
+            data: [
+              { x: "2026-09-08T10:00:00Z", y: null },
+              { x: "2026-09-08T10:05:00Z", y: null },
+            ],
+          },
+        ],
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Aucune donnée à afficher pour cette sélection.");
+  });
+
+  it("n'affiche pas le message 'aucune donnée' dès qu'une valeur est exploitable", async () => {
+    const wrapper = mount(MeasuresChart, {
+      props: {
+        series: [
+          {
+            label: "Tension",
+            data: [
+              { x: "2026-09-08T10:00:00Z", y: null },
+              { x: "2026-09-08T10:05:00Z", y: 400 },
+            ],
+          },
+        ],
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("Aucune donnée à afficher pour cette sélection.");
+  });
 });
