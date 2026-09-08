@@ -18,7 +18,7 @@ const { t } = useI18n();
       >
         <strong>{{ t(`severity.${alert.severity}`, alert.severity) }}</strong> - {{ alert.message }}
         <br />
-        <small>{{ alert.site_id }} · {{ new Date(alert.timestamp).toLocaleString() }}</small>
+        <small class="muted">{{ alert.site_id }} · <span class="tabular-nums">{{ new Date(alert.timestamp).toLocaleString() }}</span></small>
       </li>
     </ul>
   </section>

@@ -55,7 +55,7 @@ function goTo(page) {
     <button type="button" :disabled="page <= 1" @click="goTo(page - 1)">
       &larr; {{ t("common.previous") }}
     </button>
-    <span class="muted">{{ t("common.page") }} {{ page }} / {{ totalPages }} ({{ total }} {{ t("common.results") }})</span>
+    <span class="muted tabular-nums">{{ t("common.page") }} {{ page }} / {{ totalPages }} ({{ total }} {{ t("common.results") }})</span>
     <button type="button" :disabled="page >= totalPages" @click="goTo(page + 1)">
       {{ t("common.next") }} &rarr;
     </button>

@@ -10,10 +10,15 @@
     "recommendations": "Recommendations"
   },
   "profile": {
+    "menu": "Profile menu",
     "theme_light": "Light mode",
     "theme_dark": "Dark mode",
     "language": "Language",
     "logout": "Log out"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
   },
   "common": {
     "loading": "Loading…",

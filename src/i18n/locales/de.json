@@ -10,10 +10,15 @@
     "recommendations": "Empfehlungen"
   },
   "profile": {
+    "menu": "Profilmenü",
     "theme_light": "Heller Modus",
     "theme_dark": "Dunkler Modus",
     "language": "Sprache",
     "logout": "Abmelden"
+  },
+  "sidebar": {
+    "collapse": "Seitenleiste einklappen",
+    "expand": "Seitenleiste ausklappen"
   },
   "common": {
     "loading": "Wird geladen…",

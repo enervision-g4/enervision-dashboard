@@ -135,8 +135,9 @@ onBeforeUnmount(() => {
           :key="tile.severity"
           :to="{ path: '/alerts', query: { severity: tile.severity } }"
           class="stat-tile"
+          :style="{ '--tile-accent': tile.color }"
         >
-          <div class="stat-tile__value" :style="{ color: tile.color }">{{ tile.count }}</div>
+          <div class="stat-tile__value">{{ tile.count }}</div>
           <div class="stat-tile__label">{{ t(`severity.${tile.severity}`) }}</div>
         </RouterLink>
       </section>

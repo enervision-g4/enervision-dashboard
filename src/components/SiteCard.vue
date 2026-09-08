@@ -16,7 +16,7 @@ const { t } = useI18n();
     </div>
     <p class="muted site-card__location">{{ site.location }}</p>
     <div class="site-card__meta">
-      <span>{{ t("sites.capacity") }} : {{ site.capacity_kw }} kW</span>
+      <span>{{ t("sites.capacity") }} : <span class="tabular-nums">{{ site.capacity_kw }} kW</span></span>
       <span :class="`badge badge--status-${site.status}`">{{ t(`status.${site.status}`, site.status) }}</span>
     </div>
   </RouterLink>
@@ -27,6 +27,11 @@ const { t } = useI18n();
   display: block;
   color: inherit;
   text-decoration: none;
+}
+
+.site-card:hover {
+  border-color: var(--color-text-muted);
+  box-shadow: 0 2px 8px rgba(20, 20, 30, 0.1);
 }
 
 .site-card__header {
