@@ -23,12 +23,21 @@ const props = defineProps({
   rangeKey: { type: String, default: "" },
 });
 
+// Émis (avec un léger anti-rebond) chaque fois que la fenêtre visible change
+// suite à un glissement (pan) ou un zoom molette/pincement : le parent s'en
+// sert pour charger des données supplémentaires quand on approche du bord de
+// ce qui est déjà en mémoire (voir onChartRangeChange dans HomeView/
+// SiteDetailView). Sans ça, glisser vers des dates plus anciennes affichait
+// un graphique vide dès qu'on sortait de la fenêtre initialement chargée.
+const emit = defineEmits(["rangeChange"]);
+
 const { t, locale } = useI18n();
 const { theme } = useTheme();
 const canvasRef = ref(null);
 const visibleRange = ref("");
 let chartInstance = null;
 let lastShape = null;
+let rangeChangeTimer = null;
 
 function themeColors() {
   // Chart.js ne lit pas les variables CSS : on lui donne les couleurs du
@@ -108,6 +117,21 @@ function refreshVisibleRange() {
   visibleRange.value = formatVisibleRange();
 }
 
+// Un seul point d'entrée pour "la fenêtre visible a bougé" (fin de
+// glissement, molette, pincement) : met à jour le libellé de période
+// immédiatement, et prévient le parent (anti-rebond 250ms, car la molette
+// déclenche plusieurs événements très rapprochés) pour qu'il charge la
+// donnée manquante autour du nouveau bord visible.
+function handleRangeChange() {
+  refreshVisibleRange();
+  const scale = chartInstance?.scales?.x;
+  if (!scale || !Number.isFinite(scale.min) || !Number.isFinite(scale.max)) return;
+  clearTimeout(rangeChangeTimer);
+  const min = scale.min;
+  const max = scale.max;
+  rangeChangeTimer = setTimeout(() => emit("rangeChange", { min, max }), 250);
+}
+
 function buildChart() {
   if (!canvasRef.value) return;
   chartInstance?.destroy();
@@ -152,13 +176,17 @@ function buildChart() {
       plugins: {
         legend: { display: props.series.length > 1, labels: { color: colors.text } },
         zoom: {
-          pan: { enabled: true, mode: "x", onPanComplete: refreshVisibleRange },
+          // Glisser sur le graphique fait défiler la période (pan), ça ne
+          // zoome pas sur la zone surlignée : le zoom par rectangle de
+          // sélection (drag) est désactivé au profit de la molette/pincement,
+          // plus prévisible et moins facile à déclencher par erreur.
+          pan: { enabled: true, mode: "x", onPanComplete: handleRangeChange },
           zoom: {
             wheel: { enabled: true },
-            drag: { enabled: true, backgroundColor: "rgba(59,130,246,0.15)" },
+            drag: { enabled: false },
             pinch: { enabled: true },
             mode: "x",
-            onZoomComplete: refreshVisibleRange,
+            onZoomComplete: handleRangeChange,
           },
         },
       },
@@ -216,6 +244,7 @@ watch(
   },
 );
 onBeforeUnmount(() => {
+  clearTimeout(rangeChangeTimer);
   chartInstance?.destroy();
   chartInstance = null;
 });

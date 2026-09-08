@@ -21,3 +21,16 @@ export function rangeStartTime(key, now = new Date()) {
   const hours = rangeHours(key);
   return new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
 }
+
+/**
+ * Convertit la valeur d'un <input type="datetime-local"> (heure locale, sans
+ * fuseau) en ISO UTC — même logique que le filtre "Depuis"/"Jusqu'à" de la
+ * page Alertes, centralisée ici pour être réutilisée par le sélecteur de
+ * plage personnalisée des graphiques de mesures (ex. "revenir sur le mois
+ * d'août").
+ */
+export function toIsoFromLocal(value) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}

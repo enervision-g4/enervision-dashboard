@@ -129,4 +129,42 @@ describe("MeasuresChart", () => {
 
     expect(wrapper.text()).not.toContain("Aucune donnée à afficher pour cette sélection.");
   });
+
+  it("glisser fait défiler la période (pan) au lieu de zoomer sur la zone surlignée", async () => {
+    // Régression : le zoom par rectangle de sélection (drag) et le
+    // glissement (pan) étaient tous les deux activés sur le même geste de
+    // souris, et le zoom l'emportait — glisser zoomait sur la zone surlignée
+    // au lieu de faire défiler la période dans le temps.
+    mount(MeasuresChart, {
+      props: { series: [{ label: "Consommation", data: [{ x: 1757325600000, y: 2 }] }] },
+    });
+    await flushPromises();
+
+    const zoomConfig = instances[0].config.options.plugins.zoom;
+    expect(zoomConfig.pan.enabled).toBe(true);
+    expect(zoomConfig.zoom.drag.enabled).toBe(false);
+  });
+
+  it("émet 'rangeChange' (avec anti-rebond) quand la fenêtre visible bouge", async () => {
+    // Le parent (HomeView/SiteDetailView) s'en sert pour charger davantage de
+    // données quand on approche du bord de ce qui est déjà en mémoire — sans
+    // ça, glisser vers des dates plus anciennes affichait un graphique vide.
+    vi.useFakeTimers();
+    try {
+      const wrapper = mount(MeasuresChart, {
+        props: { series: [{ label: "Consommation", data: [{ x: 1757325600000, y: 2 }] }] },
+      });
+      await flushPromises();
+
+      const chart = instances[0];
+      chart.scales.x = { min: 1000, max: 2000 };
+      chart.config.options.plugins.zoom.pan.onPanComplete();
+
+      expect(wrapper.emitted("rangeChange")).toBeUndefined();
+      vi.advanceTimersByTime(250);
+      expect(wrapper.emitted("rangeChange")).toEqual([[{ min: 1000, max: 2000 }]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
