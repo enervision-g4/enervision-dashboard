@@ -9,18 +9,24 @@ import { useTheme } from "@/composables/useTheme";
 
 Chart.register(...registerables, zoomPlugin);
 
-const DEFAULT_COLORS = ["#2f6feb", "#2f855a", "#b3720a", "#d33", "#805ad5"];
+const DEFAULT_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#fb4d63", "#8b5cf6"];
 
 const props = defineProps({
-  // [{ label, color?, data: [{x: Date|string, y: number}] }]
+  // [{ label, color?, data: [{x: Date|string|number, y: number}] }]
   series: { type: Array, required: true },
   yLabel: { type: String, default: "" },
   height: { type: Number, default: 320 },
+  // Change quand la plage temporelle demandée change (ex. "24h" -> "1h") :
+  // le zoom/pan en cours doit alors être réinitialisé, sinon le graphique
+  // reste bloqué sur l'ancienne fenêtre visible et le sélecteur de période
+  // semble sans effet.
+  rangeKey: { type: String, default: "" },
 });
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { theme } = useTheme();
 const canvasRef = ref(null);
+const visibleRange = ref("");
 let chartInstance = null;
 let lastShape = null;
 
@@ -33,10 +39,24 @@ function themeColors() {
     : { text: "#5b6270", grid: "#dde1e6" };
 }
 
+/**
+ * Chart.js tourne ici en `parsing: false` (indispensable au patch incrémental
+ * d'un point poussé par le WebSocket) : il n'interprète donc PAS les valeurs,
+ * et un `x` sous forme de chaîne ISO reste une chaîne que l'échelle de type
+ * "time" ne sait pas placer — plus aucun point ne s'affichait. On convertit
+ * donc ici, une bonne fois pour toutes les vues, en millisecondes.
+ */
+function normalizeData(data) {
+  return (data ?? [])
+    .map((point) => ({ x: new Date(point.x).getTime(), y: point.y }))
+    .filter((point) => Number.isFinite(point.x))
+    .sort((a, b) => a.x - b.x);
+}
+
 function buildDatasets() {
   return props.series.map((s, i) => ({
     label: s.label,
-    data: s.data,
+    data: normalizeData(s.data),
     borderColor: s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
     backgroundColor: s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
     tension: 0.25,
@@ -45,12 +65,47 @@ function buildDatasets() {
   }));
 }
 
-// Une "forme" différente (métrique/site changé, nombre de séries) impose un
-// vrai rebuild du graphique ; une série qui s'allonge simplement (un nouveau
-// point poussé par le WebSocket) ne fait que patcher les données en place —
-// c'est ce qui évite de "recharger tout le graphique" à chaque mesure.
+// Une "forme" différente (métrique/site changé, nombre de séries, libellé
+// d'axe) impose un vrai rebuild ; une série qui s'allonge simplement (un
+// nouveau point poussé par le WebSocket) ne fait que patcher les données en
+// place — c'est ce qui évite de reconstruire tout le graphique à chaque mesure.
 function shapeKey() {
-  return props.series.map((s) => s.label).join("|");
+  return `${props.series.length}|${props.series.map((s) => s.label).join("~")}|${props.yLabel}`;
+}
+
+/**
+ * Libellé du jour (ou de la plage de jours) réellement visible à l'écran.
+ * L'axe X n'affiche que des heures dès qu'on zoome sur une courte période :
+ * sans ce repère, impossible de savoir de quel jour il s'agit.
+ */
+function formatVisibleRange() {
+  const scale = chartInstance?.scales?.x;
+  if (!scale || !Number.isFinite(scale.min) || !Number.isFinite(scale.max)) return "";
+
+  const start = new Date(scale.min);
+  const end = new Date(scale.max);
+  const sameDay = start.toDateString() === end.toDateString();
+
+  if (sameDay) {
+    return new Intl.DateTimeFormat(locale.value, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(start);
+  }
+
+  const short = new Intl.DateTimeFormat(locale.value, { day: "numeric", month: "short" });
+  const long = new Intl.DateTimeFormat(locale.value, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `${short.format(start)} - ${long.format(end)}`;
+}
+
+function refreshVisibleRange() {
+  visibleRange.value = formatVisibleRange();
 }
 
 function buildChart() {
@@ -66,10 +121,22 @@ function buildChart() {
       maintainAspectRatio: false,
       animation: false,
       parsing: false,
+      interaction: { mode: "nearest", axis: "x", intersect: false },
       scales: {
         x: {
           type: "time",
-          time: { tooltipFormat: "dd/MM/yyyy HH:mm" },
+          time: {
+            tooltipFormat: "dd/MM/yyyy HH:mm",
+            // Le jour complet est porté par le libellé au-dessus du graphique
+            // (voir formatVisibleRange) : les graduations restent courtes.
+            displayFormats: {
+              minute: "HH:mm",
+              hour: "HH:mm",
+              day: "dd/MM",
+              week: "dd/MM",
+              month: "MM/yyyy",
+            },
+          },
           // autoSkip + une seule ligne d'étiquettes : l'axe reste lisible
           // quel que soit le nombre de points, Chart.js choisit lui-même
           // l'unité (minute/heure/jour) selon la plage affichée/zoomée.
@@ -85,25 +152,28 @@ function buildChart() {
       plugins: {
         legend: { display: props.series.length > 1, labels: { color: colors.text } },
         zoom: {
-          pan: { enabled: true, mode: "x" },
+          pan: { enabled: true, mode: "x", onPanComplete: refreshVisibleRange },
           zoom: {
             wheel: { enabled: true },
-            drag: { enabled: true, backgroundColor: "rgba(47,111,235,0.15)" },
+            drag: { enabled: true, backgroundColor: "rgba(59,130,246,0.15)" },
             pinch: { enabled: true },
             mode: "x",
+            onZoomComplete: refreshVisibleRange,
           },
         },
       },
     },
   });
   lastShape = shapeKey();
+  refreshVisibleRange();
 }
 
 function patchChart() {
   chartInstance.data.datasets.forEach((ds, i) => {
-    ds.data = props.series[i]?.data ?? [];
+    ds.data = normalizeData(props.series[i]?.data);
   });
   chartInstance.update("none");
+  refreshVisibleRange();
 }
 
 function render() {
@@ -117,12 +187,23 @@ function render() {
 
 function resetZoom() {
   chartInstance?.resetZoom();
+  refreshVisibleRange();
 }
 defineExpose({ resetZoom });
 
 onMounted(render);
 watch(() => props.series, render, { deep: true });
 watch(theme, buildChart);
+watch(locale, refreshVisibleRange);
+// Nouvelle période demandée : les données changent ET la fenêtre visible doit
+// repartir de zéro, sinon un zoom laissé actif masque la nouvelle plage.
+watch(
+  () => props.rangeKey,
+  () => {
+    resetZoom();
+    render();
+  },
+);
 onBeforeUnmount(() => {
   chartInstance?.destroy();
   chartInstance = null;
@@ -132,6 +213,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="chart-card">
     <div class="chart-toolbar">
+      <span v-if="visibleRange" class="chart-period" :title="t('common.visible_period')">
+        {{ visibleRange }}
+      </span>
       <button type="button" @click="resetZoom">{{ t("common.reset_zoom") }}</button>
     </div>
     <div class="chart-canvas-wrap" :style="{ height: `${height}px` }">
@@ -146,8 +230,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .chart-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
   margin-bottom: 0.5rem;
+}
+.chart-period {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .chart-canvas-wrap {
   position: relative;

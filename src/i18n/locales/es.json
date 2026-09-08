@@ -35,12 +35,13 @@
     "previous": "Anterior",
     "next": "Siguiente",
     "per_page": "Por página",
-    "custom": "Otro…",
     "auto": "Automático",
     "no_data": "No hay datos para esta selección.",
     "reset_zoom": "Restablecer zoom",
     "coming_soon": "Próximamente",
-    "coming_soon_detail": "Esta función está en desarrollo y estará disponible próximamente."
+    "coming_soon_detail": "Esta función está en desarrollo y estará disponible próximamente.",
+    "reset_filters": "Restablecer filtros",
+    "visible_period": "Periodo mostrado"
   },
   "severity": {
     "critical": "Crítica",
@@ -66,7 +67,10 @@
     "password": "Contraseña",
     "submit": "Iniciar sesión",
     "submitting": "Iniciando sesión…",
-    "invalid": "Credenciales inválidas."
+    "invalid": "Credenciales inválidas.",
+    "heading": "Iniciar sesión",
+    "subtitle": "Accede al panel de tus sitios.",
+    "tagline": "Controla el consumo energético de tus sitios en tiempo real."
   },
   "home": {
     "title": "Resumen",

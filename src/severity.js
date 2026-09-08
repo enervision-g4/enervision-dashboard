@@ -6,11 +6,14 @@
  */
 export const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
 
+// Teintes lumineuses : mêmes familles (violet/rouge/orange/jaune), plus
+// saturées et plus claires que les précédentes. Doivent rester identiques
+// aux variables --color-severity-* de src/style.css.
 export const SEVERITY_COLORS = {
-  critical: "#7c3aed",
-  high: "#e53e3e",
-  medium: "#dd6b20",
-  low: "#d69e2e",
+  critical: "#8b5cf6",
+  high: "#fb4d63",
+  medium: "#f97316",
+  low: "#f5c518",
 };
 
 export const SEVERITY_FALLBACK_COLOR = "#5b6270";

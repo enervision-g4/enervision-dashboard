@@ -35,12 +35,13 @@
     "previous": "Previous",
     "next": "Next",
     "per_page": "Per page",
-    "custom": "Custom…",
     "auto": "Automatic",
     "no_data": "No data to display for this selection.",
     "reset_zoom": "Reset zoom",
     "coming_soon": "Coming soon",
-    "coming_soon_detail": "This feature is under development and will be available soon."
+    "coming_soon_detail": "This feature is under development and will be available soon.",
+    "reset_filters": "Reset filters",
+    "visible_period": "Visible period"
   },
   "severity": {
     "critical": "Critical",
@@ -66,7 +67,10 @@
     "password": "Password",
     "submit": "Sign in",
     "submitting": "Signing in…",
-    "invalid": "Invalid credentials."
+    "invalid": "Invalid credentials.",
+    "heading": "Sign in",
+    "subtitle": "Access the dashboard for your sites.",
+    "tagline": "Monitor your sites' energy consumption in real time."
   },
   "home": {
     "title": "Overview",
