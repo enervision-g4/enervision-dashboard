@@ -4,12 +4,12 @@ import { useI18n } from "vue-i18n";
 
 import { fetchRecommendations } from "@/api/recommendations";
 import { fetchSites } from "@/api/sites";
+import Pagination from "@/components/Pagination.vue";
 
 // Pas de flux temps réel dédié pour les recommandations (voir README de
 // l'API : seuls /ws/readings et /ws/alerts existent) : un rafraîchissement
 // discret suffit, même cadence que le résumé des alertes sur l'accueil.
 const REFRESH_INTERVAL_MS = 30_000;
-const LIMIT_OPTIONS = [10, 25, 50, 100];
 
 // "open" est le seul statut que enervision-ml écrit aujourd'hui
 // (RECOMMENDATION_STATUS dans transform/recommendations.py) : aucune route
@@ -18,10 +18,20 @@ const LIMIT_OPTIONS = [10, 25, 50, 100];
 // jour où ça change.
 const STATUS_OPTIONS = ["open"];
 
-const { t } = useI18n();
+// La description ("action_description") est générée côté enervision-ml sous
+// la forme fixe "... a YYYY-MM-DD HH:MM UTC, ..." (voir
+// transform/recommendations.py, `_build_recommendation`) : on repère cette
+// sous-chaîne pour la reformater dans un format lisible selon la langue
+// choisie (ex. JJ/MM/AAAA HH:mm en français), plutôt que de la laisser telle
+// quelle. On ne convertit pas le fuseau horaire (l'heure reste celle donnée
+// par l'API, en UTC) : seule la mise en forme change avec la langue.
+const EMBEDDED_DATE_RE = /(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) UTC/;
+
+const { t, locale } = useI18n();
 
 const sites = ref([]);
 const items = ref([]);
+const total = ref(0);
 const loading = ref(true);
 const loadError = ref("");
 let refreshIntervalId = null;
@@ -30,6 +40,8 @@ let refreshIntervalId = null;
 let requestToken = 0;
 
 const filters = reactive({ siteId: "", status: "" });
+const order = ref("desc");
+const page = ref(1);
 const limit = ref(25);
 
 const siteNamesById = ref({});
@@ -42,6 +54,23 @@ function statusBadgeClass(status) {
   return `badge badge--${status === "open" ? "open" : "info"}`;
 }
 
+function formatActionDescription(description) {
+  if (!description) return description;
+  const match = description.match(EMBEDDED_DATE_RE);
+  if (!match) return description;
+  const date = new Date(`${match[1]}T${match[2]}:00Z`);
+  if (Number.isNaN(date.getTime())) return description;
+  const formatted = new Intl.DateTimeFormat(locale.value, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
+  return description.replace(match[0], `${formatted} UTC`);
+}
+
 async function loadRecommendations({ silent = false } = {}) {
   const token = ++requestToken;
   if (!silent) loading.value = true;
@@ -49,10 +78,14 @@ async function loadRecommendations({ silent = false } = {}) {
     const data = await fetchRecommendations({
       siteId: filters.siteId || undefined,
       status: filters.status || undefined,
+      sortBy: "timestamp",
+      order: order.value,
+      page: page.value,
       limit: limit.value,
     });
     if (token !== requestToken) return; // Réponse périmée.
-    items.value = data;
+    items.value = data.items;
+    total.value = data.total;
     loadError.value = "";
   } catch {
     if (token !== requestToken) return;
@@ -62,15 +95,26 @@ async function loadRecommendations({ silent = false } = {}) {
   }
 }
 
-function onLimitChange(event) {
-  limit.value = Number(event.target.value);
+function toggleOrder() {
+  order.value = order.value === "asc" ? "desc" : "asc";
+}
+
+function onLimitChange(newLimit) {
+  limit.value = newLimit;
+  page.value = 1;
   loadRecommendations();
 }
 
+// Tout changement de filtre ou de tri repart de la page 1 : rester sur une
+// page qui n'existe plus une fois le filtre/tri appliqué serait déroutant.
 watch(
-  () => [filters.siteId, filters.status],
-  () => loadRecommendations(),
+  () => [filters.siteId, filters.status, order.value],
+  () => {
+    page.value = 1;
+    loadRecommendations();
+  },
 );
+watch(page, () => loadRecommendations());
 
 onMounted(async () => {
   try {
@@ -110,19 +154,16 @@ onBeforeUnmount(() => clearInterval(refreshIntervalId));
         </select>
       </label>
 
-      <label class="filter-field">
-        {{ t("common.per_page") }}
-        <select :value="limit" @change="onLimitChange">
-          <option v-for="option in LIMIT_OPTIONS" :key="option" :value="option">{{ option }}</option>
-        </select>
-      </label>
+      <button type="button" class="sort-toggle" @click="toggleOrder">
+        {{ t("recommendations.sort_by_date") }} {{ order === "asc" ? "▲" : "▼" }}
+      </button>
 
       <button v-if="filters.siteId || filters.status" type="button" @click="Object.assign(filters, { siteId: '', status: '' })">
         {{ t("common.reset_filters") }}
       </button>
     </div>
 
-    <p v-if="loading">{{ t("common.loading") }}</p>
+    <p v-if="loading && !items.length">{{ t("common.loading") }}</p>
     <p v-else-if="loadError" class="error">{{ loadError }}</p>
 
     <template v-else>
@@ -134,11 +175,20 @@ onBeforeUnmount(() => clearInterval(refreshIntervalId));
             </span>
             <span class="muted tabular-nums">{{ new Date(recommendation.timestamp).toLocaleString() }}</span>
           </div>
-          <p class="recommendation-description">{{ recommendation.action_description }}</p>
+          <p class="recommendation-description">{{ formatActionDescription(recommendation.action_description) }}</p>
           <p class="muted">{{ siteName(recommendation.site_id) }}</p>
         </li>
       </ul>
       <p v-else class="muted">{{ t("recommendations.none") }}</p>
+
+      <Pagination
+        v-if="items.length"
+        :page="page"
+        :total="total"
+        :limit="limit"
+        @update:page="(p) => (page = p)"
+        @update:limit="onLimitChange"
+      />
     </template>
   </main>
 </template>

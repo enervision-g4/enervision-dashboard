@@ -116,6 +116,7 @@
     "site": "Site",
     "status": "Statut",
     "status_open": "Ouverte",
+    "sort_by_date": "Trier par date",
     "none": "Aucune recommandation pour ces filtres."
   }
 }

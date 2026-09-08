@@ -1,15 +1,27 @@
 import apiClient from "./client";
 
 /**
- * GET /api/v1/recommendations (voir enervision-api/app/routers/recommendations.py).
- * Contrairement à /api/v1/alerts, cette route renvoie une simple liste (pas
- * d'enveloppe {items, total, page, limit}) : pas de pagination serveur, juste
- * les `limit` recommandations les plus récentes, triées par date de
- * génération décroissante.
+ * GET /api/v1/recommendations paginé/triable/filtrable côté serveur, même
+ * enveloppe {items, total, page, limit} que /api/v1/alerts (voir
+ * enervision-api/app/routers/recommendations.py).
  */
-export async function fetchRecommendations({ siteId, status, limit = 50 } = {}) {
+export async function fetchRecommendations({
+  siteId,
+  status,
+  sortBy = "timestamp",
+  order = "desc",
+  page = 1,
+  limit = 25,
+} = {}) {
   const { data } = await apiClient.get("/api/v1/recommendations", {
-    params: { site_id: siteId, status, limit },
+    params: {
+      site_id: siteId,
+      status,
+      sort_by: sortBy,
+      order,
+      page,
+      limit,
+    },
   });
   return data;
 }
