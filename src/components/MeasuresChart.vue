@@ -203,7 +203,15 @@ function buildChart() {
       maintainAspectRatio: false,
       animation: false,
       parsing: false,
-      interaction: { mode: "nearest", axis: "x", intersect: false },
+      // `axis: "x"` (avant) ne comparait que la distance horizontale au
+      // curseur : sur un graphique à deux courbes (ex. mesures + prévision),
+      // le point le plus proche EN X n'est pas forcément celui sous la
+      // souris — la courbe restait alors "collée" sur l'une des deux
+      // (prévision) même en survolant nettement l'autre (mesures), sans
+      // moyen de reprendre la main sinon en masquant les deux séries via la
+      // légende. Sans `axis`, Chart.js compare la distance réelle (x ET y)
+      // et suit correctement la courbe effectivement sous le curseur.
+      interaction: { mode: "nearest", intersect: false },
       scales: {
         x: {
           type: "time",

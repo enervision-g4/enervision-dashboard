@@ -232,4 +232,27 @@ describe("MeasuresChart", () => {
     expect(chart.data.datasets[0].borderColor).toBe("#3b82f6");
     expect(chart.data.datasets[1].borderColor).toBe("#fb4d63");
   });
+
+  it("le survol du graphique compare la distance réelle (x et y), pas seulement x", async () => {
+    // Avec `axis: "x"` (bug initial), le point retenu au survol est le plus
+    // proche EN X uniquement, quelle que soit la courbe réellement sous le
+    // curseur : sur un graphique à deux séries (mesures + prévision), le
+    // survol restait "collé" sur l'une des deux même en pointant nettement
+    // l'autre. Sans `axis` (défaut Chart.js "xy" pour le mode "nearest"),
+    // les deux dimensions comptent.
+    mount(MeasuresChart, {
+      props: {
+        series: [
+          { label: "Mesures", data: [{ x: 1757325600000, y: 2 }] },
+          { label: "Prévision", data: [{ x: 1757325600000, y: 3 }] },
+        ],
+      },
+    });
+    await flushPromises();
+
+    const interaction = instances[0].config.options.interaction;
+    expect(interaction.mode).toBe("nearest");
+    expect(interaction.intersect).toBe(false);
+    expect(interaction.axis).toBeUndefined();
+  });
 });
