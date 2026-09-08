@@ -102,8 +102,15 @@
     "chart_title": "Alertes par sévérité",
     "chart_scale": "Échelle de l'axe"
   },
+  "predictions": {
+    "title": "Prédictions de consommation",
+    "site": "Site",
+    "history": "Historique affiché",
+    "measures_series": "Mesures",
+    "forecast_series": "Prévision",
+    "generated_at": "Prévisions générées le {date}"
+  },
   "coming_soon": {
-    "predictions_title": "Prédictions",
     "recommendations_title": "Recommandations"
   }
 }

@@ -102,8 +102,15 @@
     "chart_title": "Alertas por severidad",
     "chart_scale": "Escala del eje"
   },
+  "predictions": {
+    "title": "Predicciones de consumo",
+    "site": "Sitio",
+    "history": "Historial mostrado",
+    "measures_series": "Mediciones",
+    "forecast_series": "Predicción",
+    "generated_at": "Predicciones generadas el {date}"
+  },
   "coming_soon": {
-    "predictions_title": "Predicciones",
     "recommendations_title": "Recomendaciones"
   }
 }
