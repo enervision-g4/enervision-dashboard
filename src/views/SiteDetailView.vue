@@ -9,7 +9,7 @@ import AlertList from "@/components/AlertList.vue";
 import MeasuresChart from "@/components/MeasuresChart.vue";
 import TimeRangeSelector from "@/components/TimeRangeSelector.vue";
 import { useLiveSocket } from "@/composables/useLiveSocket";
-import { rangeStartTime } from "@/timeRanges";
+import { rangeHours } from "@/timeRanges";
 
 const RECENT_ALERTS_LIMIT = 5;
 
@@ -66,7 +66,12 @@ async function loadReadings() {
   const token = ++readingsToken;
   const data = await fetchReadings({
     siteId: props.siteId,
-    startTime: rangeStartTime(timeRange.value),
+    // Fenêtre calculée côté serveur, ancrée sur la donnée la plus récente
+    // réellement en base — voir le même commentaire dans HomeView.vue et
+    // app/routers/readings.py. Corrige le cas où "1h" n'affichait rien alors
+    // que "24h" montrait des données du jour même (léger retard d'ingestion
+    // dépassant la période choisie).
+    rangeHours: rangeHours(timeRange.value),
     limit: 1000,
   });
   if (token === readingsToken) readings.value = data;
@@ -99,10 +104,12 @@ function connectLiveReadings() {
     () => ({ site_id: props.siteId, since: newestReadingTimestamp() }),
     (msg) => {
       if (msg.type !== "reading" || msg.data.site_id !== props.siteId) return;
-      const floor = new Date(rangeStartTime(timeRange.value)).getTime();
-      readings.value = [...readings.value, msg.data].filter(
-        (reading) => new Date(reading.timestamp).getTime() >= floor,
-      );
+      // Ancré sur l'horodatage le plus récent des données elles-mêmes, pas
+      // sur l'horloge du navigateur — même raison que loadReadings ci-dessus.
+      const next = [...readings.value, msg.data];
+      const newest = next.reduce((max, r) => Math.max(max, new Date(r.timestamp).getTime()), 0);
+      const floor = newest - rangeHours(timeRange.value) * 60 * 60 * 1000;
+      readings.value = next.filter((reading) => new Date(reading.timestamp).getTime() >= floor);
     },
   );
 }
