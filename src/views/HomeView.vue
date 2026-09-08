@@ -9,7 +9,7 @@ import MeasuresChart from "@/components/MeasuresChart.vue";
 import TimeRangeSelector from "@/components/TimeRangeSelector.vue";
 import { useLiveSocket } from "@/composables/useLiveSocket";
 import { SEVERITY_ORDER, severityColor } from "@/severity";
-import { rangeHours } from "@/timeRanges";
+import { rangeHours, toIsoFromLocal } from "@/timeRanges";
 
 // Les tuiles de résumé n'ont pas (encore) de flux temps réel dédié côté API :
 // un rafraîchissement discret reste nécessaire, mais bien plus espacé que
@@ -29,6 +29,13 @@ const sites = ref([]);
 const selectedSiteId = ref("");
 const selectedMetric = ref(METRICS[0].key);
 const timeRange = ref("24h");
+// Plage personnalisée ("Depuis"/"Jusqu'à", ex. revenir sur le mois d'août) :
+// dès que `customStart` est renseigné elle prend le pas sur les boutons de
+// période 1h/6h/24h/7j. Vider les deux champs (le "×" natif du champ
+// datetime-local) revient au bouton de période sélectionné.
+const customStart = ref("");
+const customEnd = ref("");
+const hasCustomRange = computed(() => !!customStart.value);
 const readings = ref([]);
 const alertsSummary = ref({});
 const loading = ref(true);
@@ -36,12 +43,29 @@ const loadError = ref("");
 let summaryIntervalId = null;
 let liveSocket = null;
 
+// Bornes (ms epoch) de ce qui est effectivement chargé en mémoire pour le
+// site/la période courante — sert à décider, quand on glisse/zoome sur le
+// graphique, s'il faut aller chercher des données supplémentaires auprès de
+// l'API (voir onChartRangeChange). Remises à zéro à chaque nouveau chargement
+// (changement de site ou de période).
+let loadedStartMs = null;
+let loadedEndMs = null;
+
 const chartSeries = computed(() => [
   {
     label: t(METRICS.find((m) => m.key === selectedMetric.value)?.labelKey),
     data: readings.value.map((r) => ({ x: r.timestamp, y: r[selectedMetric.value] })),
   },
 ]);
+
+// Identifie la "fenêtre logique" demandée (période préréglée, ou plage
+// personnalisée) : passé à MeasuresChart comme rangeKey pour réinitialiser le
+// zoom/pan quand elle change. Ne doit PAS changer quand on charge simplement
+// plus de données en glissant sur le graphique (extension de fenêtre), sinon
+// le pan en cours serait annulé à chaque chargement.
+const windowKey = computed(() =>
+  hasCustomRange.value ? `custom|${customStart.value}|${customEnd.value}` : timeRange.value,
+);
 
 const severityTiles = computed(() =>
   SEVERITY_ORDER.filter((severity) => severity in alertsSummary.value).map((severity) => ({
@@ -59,28 +83,132 @@ const totalAlerts = computed(() =>
 // entre-temps) ne doit pas écraser la série affichée.
 let readingsToken = 0;
 
+/** Paramètres de fenêtre pour l'API : plage personnalisée si renseignée,
+ * sinon la période préréglée (calculée côté serveur, voir plus bas). */
+function windowParams() {
+  if (hasCustomRange.value) {
+    return {
+      startTime: toIsoFromLocal(customStart.value),
+      endTime: toIsoFromLocal(customEnd.value) || new Date().toISOString(),
+    };
+  }
+  // `rangeHours` : la fenêtre est calculée côté serveur, ancrée sur la
+  // donnée la plus récente réellement en base — immunise les périodes
+  // courtes (1h, 6h) contre un léger retard d'ingestion ou un décalage
+  // d'horloge entre l'ETL et l'API (voir app/routers/readings.py). Une
+  // fenêtre calculée ici depuis l'horloge du navigateur pouvait exclure toute
+  // donnée existante dès que ce retard dépassait la période choisie — "1h"
+  // apparaissait vide alors que "24h" montrait des données du jour même.
+  return { rangeHours: rangeHours(timeRange.value) };
+}
+
+/** Mémorise la fenêtre effectivement couverte par `data`, pour savoir plus
+ * tard s'il faut recharger en glissant sur le graphique (voir
+ * onChartRangeChange). À défaut de donnée, on retombe sur la fenêtre
+ * demandée : le graphique reste vide mais on sait déjà ce qui a été essayé,
+ * évitant de la redemander en boucle. */
+function rememberLoadedBounds(data, params) {
+  if (data.length) {
+    loadedStartMs = new Date(data[0].timestamp).getTime();
+    loadedEndMs = new Date(data[data.length - 1].timestamp).getTime();
+    return;
+  }
+  if (params.startTime && params.endTime) {
+    loadedStartMs = new Date(params.startTime).getTime();
+    loadedEndMs = new Date(params.endTime).getTime();
+  } else {
+    loadedEndMs = Date.now();
+    loadedStartMs = loadedEndMs - (params.rangeHours ?? 24) * 60 * 60 * 1000;
+  }
+}
+
+/** Fusionne de nouvelles lignes dans `readings` (dédoublonnées par
+ * horodatage, triées) — utilisé aussi bien par l'extension de fenêtre au
+ * glisser que par le flux temps réel. */
+function mergeReadings(rows) {
+  if (!rows.length) return;
+  const byTimestamp = new Map(readings.value.map((r) => [r.timestamp, r]));
+  for (const row of rows) byTimestamp.set(row.timestamp, row);
+  readings.value = [...byTimestamp.values()].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+  // Garde-fou : une session laissée ouverte très longtemps ne doit pas faire
+  // grossir la série indéfiniment (flux temps réel + glissements successifs).
+  const MAX_POINTS = 20000;
+  if (readings.value.length > MAX_POINTS) {
+    readings.value = readings.value.slice(readings.value.length - MAX_POINTS);
+  }
+}
+
 async function loadReadings() {
   if (!selectedSiteId.value) return;
   const token = ++readingsToken;
   try {
-    const data = await fetchReadings({
-      siteId: selectedSiteId.value,
-      // `rangeHours` : la fenêtre est calculée côté serveur, ancrée sur la
-      // donnée la plus récente réellement en base — immunise les périodes
-      // courtes (1h, 6h) contre un léger retard d'ingestion ou un décalage
-      // d'horloge entre l'ETL et l'API (voir app/routers/readings.py). Une
-      // fenêtre calculée ici depuis l'horloge du navigateur pouvait exclure
-      // toute donnée existante dès que ce retard dépassait la période
-      // choisie — "1h" apparaissait vide alors que "24h" montrait des
-      // données du jour même.
-      rangeHours: rangeHours(timeRange.value),
-      limit: 1000,
-    });
+    const params = windowParams();
+    const data = await fetchReadings({ siteId: selectedSiteId.value, limit: 1000, ...params });
     if (token !== readingsToken) return;
     readings.value = data;
+    rememberLoadedBounds(data, params);
     loadError.value = "";
   } catch {
     if (token === readingsToken) loadError.value = t("common.error_generic");
+  }
+}
+
+// Glisser (pan) ou zoomer sur le graphique peut amener la fenêtre visible en
+// dehors de ce qui est chargé en mémoire — sans quoi le graphique paraissait
+// vide dès qu'on quittait la fenêtre initiale ("je n'ai pas de valeur
+// avant"). On étend alors le chargement d'un "écran" supplémentaire de
+// chaque côté qui en a besoin, sans jamais réinitialiser le zoom/pan en
+// cours (contrairement à un changement de période).
+let extendingBefore = false;
+let extendingAfter = false;
+
+async function onChartRangeChange({ min, max }) {
+  if (!selectedSiteId.value || loadedStartMs === null) return;
+  const span = max - min;
+  if (!(span > 0)) return;
+  const margin = span * 0.5;
+
+  if (min - margin < loadedStartMs && !extendingBefore) {
+    extendingBefore = true;
+    const targetStart = new Date(min - span).toISOString();
+    const targetEnd = new Date(loadedStartMs).toISOString();
+    try {
+      const older = await fetchReadings({
+        siteId: selectedSiteId.value,
+        startTime: targetStart,
+        endTime: targetEnd,
+        limit: 1000,
+      });
+      mergeReadings(older);
+      loadedStartMs = Math.min(loadedStartMs, new Date(targetStart).getTime());
+    } catch {
+      // Le glissement reste utilisable même si cette extension échoue ; on
+      // retentera au prochain glissement.
+    } finally {
+      extendingBefore = false;
+    }
+  }
+
+  if (max + margin > loadedEndMs && !extendingAfter) {
+    extendingAfter = true;
+    const targetStart = new Date(loadedEndMs).toISOString();
+    const targetEnd = new Date(max + span).toISOString();
+    try {
+      const newer = await fetchReadings({
+        siteId: selectedSiteId.value,
+        startTime: targetStart,
+        endTime: targetEnd,
+        limit: 1000,
+      });
+      mergeReadings(newer);
+      loadedEndMs = Math.max(loadedEndMs, new Date(targetEnd).getTime());
+    } catch {
+      // idem
+    } finally {
+      extendingAfter = false;
+    }
   }
 }
 
@@ -109,16 +237,15 @@ function connectLive() {
     () => ({ site_id: selectedSiteId.value, since: newestReadingTimestamp() }),
     (msg) => {
       if (msg.type !== "reading" || msg.data.site_id !== selectedSiteId.value) return;
-      // La fenêtre affichée glisse avec le temps : on écarte au passage les
-      // points sortis de la période choisie, sinon la série grossit sans fin.
-      // Ancré sur l'horodatage le plus récent des données elles-mêmes (pas
-      // sur l'horloge du navigateur, pour la même raison que côté serveur —
-      // voir loadReadings ci-dessus) : sans ça, un léger retard d'ingestion
-      // pouvait faire disparaître un point tout juste ajouté.
-      const next = [...readings.value, msg.data];
-      const newest = next.reduce((max, r) => Math.max(max, new Date(r.timestamp).getTime()), 0);
-      const floor = newest - rangeHours(timeRange.value) * 60 * 60 * 1000;
-      readings.value = next.filter((reading) => new Date(reading.timestamp).getTime() >= floor);
+      // On ajoute simplement le point, sans retirer les plus anciens : on
+      // permet désormais de glisser sur le graphique pour voir des données
+      // plus anciennes (voir onChartRangeChange), un filtrage systématique
+      // basé sur la période préréglée aurait supprimé ces données pourtant
+      // affichées à l'écran après un glissement. `mergeReadings` borne quand
+      // même la taille totale de la série (garde-fou mémoire).
+      mergeReadings([msg.data]);
+      const ts = new Date(msg.data.timestamp).getTime();
+      if (loadedEndMs === null || ts > loadedEndMs) loadedEndMs = ts;
     },
   );
 }
@@ -127,9 +254,26 @@ watch(selectedSiteId, async () => {
   await loadReadings();
   connectLive();
 });
-// Nouvelle période : on recharge, et le graphique remet sa fenêtre visible à
-// plat (prop rangeKey) — un zoom laissé actif masquerait la nouvelle plage.
-watch(timeRange, loadReadings);
+
+/** Sélection d'un bouton de période préréglée : efface toute plage
+ * personnalisée en cours, sinon elle resterait prioritaire et le bouton
+ * cliqué n'aurait visiblement aucun effet. */
+function selectPreset(key) {
+  customStart.value = "";
+  customEnd.value = "";
+  timeRange.value = key;
+}
+
+// Nouvelle période (préréglée ou personnalisée) : on recharge, et le
+// graphique remet sa fenêtre visible à plat (prop rangeKey) — un zoom laissé
+// actif masquerait la nouvelle plage. Anti-rebond léger : la saisie dans les
+// champs "Depuis"/"Jusqu'à" ne doit pas déclencher une requête par caractère.
+let windowChangeTimer = null;
+watch(windowKey, () => {
+  clearTimeout(windowChangeTimer);
+  windowChangeTimer = setTimeout(loadReadings, 350);
+});
+onBeforeUnmount(() => clearTimeout(windowChangeTimer));
 
 onMounted(async () => {
   loading.value = true;
@@ -199,7 +343,19 @@ onBeforeUnmount(() => {
 
         <label class="filter-field">
           {{ t("home.period") }}
-          <TimeRangeSelector v-model="timeRange" />
+          <TimeRangeSelector
+            :model-value="hasCustomRange ? '' : timeRange"
+            @update:model-value="selectPreset"
+          />
+        </label>
+
+        <label class="filter-field">
+          {{ t("common.from") }}
+          <input v-model="customStart" type="datetime-local" />
+        </label>
+        <label class="filter-field">
+          {{ t("common.to") }}
+          <input v-model="customEnd" type="datetime-local" />
         </label>
       </div>
 
@@ -207,8 +363,9 @@ onBeforeUnmount(() => {
         class="home-chart"
         :series="chartSeries"
         :y-label="t(METRICS.find((m) => m.key === selectedMetric)?.labelKey)"
-        :range-key="`${selectedSiteId}|${timeRange}`"
+        :range-key="`${selectedSiteId}|${windowKey}`"
         :height="420"
+        @range-change="onChartRangeChange"
       />
     </template>
   </main>
