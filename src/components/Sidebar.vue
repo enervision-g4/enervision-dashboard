@@ -30,9 +30,10 @@ const links = computed(() =>
 <template>
   <aside class="sidebar" :class="{ 'sidebar--collapsed': collapsed }">
     <div class="sidebar-header">
+      <!-- Le nom de la marque vit désormais dans la Topbar, à côté du menu
+           profil : seul le logo reste ici (demande produit). -->
       <RouterLink to="/" class="sidebar-brand" :aria-label="t('app.name')">
         <img src="/logo.jpeg" alt="" class="sidebar-brand__logo" />
-        <span v-if="!collapsed" class="sidebar-brand__name">{{ t("app.name") }}</span>
       </RouterLink>
       <button
         type="button"

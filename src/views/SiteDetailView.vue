@@ -13,6 +13,20 @@ import { rangeStartTime } from "@/timeRanges";
 
 const RECENT_ALERTS_LIMIT = 5;
 
+// Mêmes mesures et mêmes clés de libellé que HomeView.vue : garder les deux
+// synchronisées si une mesure est ajoutée/retirée d'un côté. Affichées ici
+// en plus de la consommation — certains sites n'ont pas de consommation
+// exploitable à un instant donné (capteur en défaut, `data_quality`
+// dégradée) alors que leurs autres mesures sont bien remontées par
+// l'ETL/ML ; ne montrer que la consommation donnait l'impression à tort
+// qu'un site n'avait "aucune donnée".
+const METRICS = [
+  { key: "consumption_kw", labelKey: "home.metric_consumption" },
+  { key: "voltage_v", labelKey: "home.metric_voltage" },
+  { key: "temperature_celsius", labelKey: "home.metric_temperature" },
+  { key: "humidity_percent", labelKey: "home.metric_humidity" },
+];
+
 const props = defineProps({
   siteId: { type: String, required: true },
 });
@@ -22,6 +36,7 @@ const { t } = useI18n();
 const site = ref(null);
 const readings = ref([]);
 const recentAlerts = ref([]);
+const selectedMetric = ref(METRICS[0].key);
 const timeRange = ref("24h");
 const loading = ref(true);
 const loadError = ref("");
@@ -31,8 +46,8 @@ let readingsToken = 0;
 
 const chartSeries = computed(() => [
   {
-    label: t("site_detail.consumption_chart"),
-    data: readings.value.map((r) => ({ x: r.timestamp, y: r.consumption_kw })),
+    label: t(METRICS.find((m) => m.key === selectedMetric.value)?.labelKey),
+    data: readings.value.map((r) => ({ x: r.timestamp, y: r[selectedMetric.value] })),
   },
 ]);
 
@@ -108,10 +123,13 @@ function connectLiveAlerts() {
 
 // Vue Router réutilise ce composant en naviguant d'une fiche site à l'autre
 // (même route) : sans ce watcher, les données du site précédent resteraient
-// affichées.
+// affichées. La mesure sélectionnée revient à la consommation par défaut à
+// chaque changement de site, plutôt que de garder un choix qui pourrait ne
+// rien afficher pour le nouveau site.
 watch(
   () => props.siteId,
   async () => {
+    selectedMetric.value = METRICS[0].key;
     await loadData();
     connectLiveReadings();
     connectLiveAlerts();
@@ -150,6 +168,15 @@ onBeforeUnmount(() => {
 
       <div class="chart-controls">
         <label class="filter-field">
+          {{ t("home.metric") }}
+          <select v-model="selectedMetric">
+            <option v-for="metric in METRICS" :key="metric.key" :value="metric.key">
+              {{ t(metric.labelKey) }}
+            </option>
+          </select>
+        </label>
+
+        <label class="filter-field">
           {{ t("home.period") }}
           <TimeRangeSelector v-model="timeRange" />
         </label>
@@ -157,7 +184,7 @@ onBeforeUnmount(() => {
 
       <MeasuresChart
         :series="chartSeries"
-        :y-label="t('site_detail.consumption_chart')"
+        :y-label="t(METRICS.find((m) => m.key === selectedMetric)?.labelKey)"
         :range-key="`${siteId}|${timeRange}`"
         :height="360"
       />

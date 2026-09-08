@@ -158,12 +158,18 @@ a {
 .topbar {
   flex-shrink: 0;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
+}
+
+.topbar-brand {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-text);
 }
 
 /* ---- Sidebar ---- */
@@ -212,12 +218,6 @@ a {
   object-fit: cover;
   border-radius: 6px;
   flex-shrink: 0;
-}
-
-.sidebar-brand__name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sidebar-collapse-toggle {
