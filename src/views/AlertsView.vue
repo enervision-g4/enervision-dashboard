@@ -187,7 +187,7 @@ onBeforeUnmount(() => liveSocket?.close());
             <td><span :class="severityClass(alert.severity)">{{ t(`severity.${alert.severity}`, alert.severity) }}</span></td>
             <td>{{ alert.site_id }}</td>
             <td>{{ alert.message }}</td>
-            <td>{{ new Date(alert.timestamp).toLocaleString() }}</td>
+            <td class="tabular-nums">{{ new Date(alert.timestamp).toLocaleString() }}</td>
           </tr>
         </tbody>
       </table>

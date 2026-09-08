@@ -24,17 +24,39 @@ function onDocumentClick(event) {
   }
 }
 
-onMounted(() => document.addEventListener("click", onDocumentClick));
-onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
+function onKeydown(event) {
+  if (event.key === "Escape" && open.value) {
+    open.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
+  document.addEventListener("keydown", onKeydown);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
+  document.removeEventListener("keydown", onKeydown);
+});
 </script>
 
 <template>
   <div ref="rootRef" class="profile-menu">
-    <button type="button" class="profile-menu__trigger" @click="open = !open">👤</button>
+    <button
+      type="button"
+      class="profile-menu__trigger"
+      :aria-label="t('profile.menu')"
+      aria-haspopup="true"
+      :aria-expanded="open"
+      @click="open = !open"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" /></svg>
+    </button>
 
-    <div v-if="open" class="profile-menu__panel">
-      <button type="button" class="profile-menu__item" @click="toggleTheme">
-        {{ theme === "dark" ? "☀️" : "🌙" }}
+    <div v-if="open" class="profile-menu__panel" role="menu">
+      <button type="button" class="profile-menu__item" role="menuitem" @click="toggleTheme">
+        <svg v-if="theme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" /></svg>
         {{ theme === "dark" ? t("profile.theme_light") : t("profile.theme_dark") }}
       </button>
 
@@ -53,8 +75,9 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
         </div>
       </div>
 
-      <button type="button" class="profile-menu__item" @click="handleLogout">
-        🚪 {{ t("profile.logout") }}
+      <button type="button" class="profile-menu__item" role="menuitem" @click="handleLogout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></svg>
+        {{ t("profile.logout") }}
       </button>
     </div>
   </div>
@@ -73,7 +96,17 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
+}
+
+.profile-menu__trigger svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.profile-menu__item svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
 }
 
 .profile-menu__panel {

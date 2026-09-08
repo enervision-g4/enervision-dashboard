@@ -10,10 +10,15 @@
     "recommendations": "Recommandations"
   },
   "profile": {
+    "menu": "Menu du profil",
     "theme_light": "Mode clair",
     "theme_dark": "Mode sombre",
     "language": "Langue",
     "logout": "Se déconnecter"
+  },
+  "sidebar": {
+    "collapse": "Réduire le menu",
+    "expand": "Déplier le menu"
   },
   "common": {
     "loading": "Chargement…",

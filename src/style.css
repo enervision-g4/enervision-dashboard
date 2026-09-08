@@ -22,6 +22,28 @@
   --color-info: #5b6270;
   --color-info-bg: #eef0f3;
   --shadow-card: 0 1px 2px rgba(20, 20, 30, 0.06);
+
+  /* Anneau de focus clavier : distinct de --color-primary pour rester
+     visible même quand un élément focus est aussi en état "primary". */
+  --color-focus-ring: #0b57d0;
+
+  /* Palette de sévérité alignée sur src/severity.js (critical=violet,
+     high=rouge, medium=orange, low=jaune) — identique claire/sombre,
+     ce sont des couleurs de statut fixes, pas des couleurs de thème.
+     Ne pas modifier ces valeurs sans le faire aussi dans severity.js. */
+  --color-severity-critical: #7c3aed;
+  --color-severity-high: #e53e3e;
+  --color-severity-medium: #dd6b20;
+  --color-severity-low: #d69e2e;
+
+  /* Échelle de densité "dashboard" : espacements resserrés pour maximiser
+     la donnée visible à l'écran sans sacrifier la lisibilité. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
 }
 
 html[data-theme="dark"] {
@@ -40,10 +62,27 @@ html[data-theme="dark"] {
   --color-warning: #f0b34c;
   --color-warning-bg: #3a2f16;
   --color-low: #4fd18a;
-  --color-low-bg: #16302322;
+  --color-low-bg: #332a12;
   --color-info: #9aa1ac;
   --color-info-bg: #262a31;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --color-focus-ring: #6ea2ff;
+}
+
+/* ---- Accessibilité : mouvement réduit ----
+   Coupe les transitions/animations décoratives pour les utilisateurs qui
+   l'ont demandé au niveau système, sans retirer les changements d'état
+   eux-mêmes (juste leur durée). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {
@@ -59,10 +98,28 @@ body {
 
 body {
   transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: var(--color-primary);
+}
+
+/* ---- Focus clavier ----
+   Visible partout (contrôles natifs + liens/boutons), jamais supprimé.
+   :focus-visible évite l'anneau au clic souris tout en le gardant au
+   clavier/switch. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Valeurs numériques (mesures, horodatages, compteurs) : chiffres de
+   largeur fixe pour que les colonnes de tableaux/tuiles ne "sautent" pas
+   d'une ligne à l'autre. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Layout général : sidebar fixe + topbar fixe + contenu qui scroll ---- */
@@ -161,6 +218,9 @@ a {
 }
 
 .sidebar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid var(--color-border);
   background: var(--color-surface-alt);
   border-radius: 6px;
@@ -169,6 +229,16 @@ a {
   padding: 0;
   line-height: 1;
   flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-collapse-toggle:hover {
+  background: var(--color-border);
+}
+
+.sidebar-collapse-toggle svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .sidebar-nav {
@@ -183,17 +253,27 @@ a {
   gap: 0.6rem;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
+  border-left: 3px solid transparent;
   color: var(--color-text);
   text-decoration: none;
   font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-link__icon {
   flex-shrink: 0;
   width: 1.2rem;
-  text-align: center;
+  height: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-link__icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .sidebar-link:hover {
@@ -202,7 +282,9 @@ a {
 
 .sidebar-link.router-link-exact-active {
   background: var(--color-primary);
+  border-left-color: var(--color-primary-contrast);
   color: var(--color-primary-contrast);
+  font-weight: 600;
 }
 
 /* ---- Cartes ---- */
@@ -218,6 +300,7 @@ a {
   border-radius: 8px;
   padding: 1rem;
   box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card--critical {
@@ -230,63 +313,108 @@ a {
   background: var(--color-warning-bg);
 }
 
-/* ---- Badges de sévérité (utilisés par AlertsView / résumé d'accueil) ---- */
+/* ---- Badges de sévérité (utilisés par AlertsView / résumé d'accueil) ----
+   Le texte reste en --color-text (contraste garanti dans les deux thèmes) :
+   la sévérité se lit à un point de couleur + une bordure gauche, jamais à
+   la seule couleur du texte. Un badge critical/high/medium/low en texte
+   coloré sur fond teinté échouait le contraste 4.5:1 (ex. low : 2.4:1) —
+   voir src/severity.js pour les valeurs de couleur, inchangées ici. */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.15rem 0.55rem;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.5rem;
   border-radius: 999px;
+  border-left: 3px solid transparent;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: capitalize;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
 }
 
-/* Palette alignée sur src/severity.js : critical=violet, high=rouge,
-   medium=orange, low=jaune — cohérent entre les tuiles d'accueil, ces
-   badges et le graphique en colonnes des alertes. */
+.badge::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
 .badge--critical {
-  color: #7c3aed;
-  background: rgba(124, 58, 237, 0.14);
+  border-left-color: var(--color-severity-critical);
+  background: color-mix(in srgb, var(--color-severity-critical) 14%, var(--color-surface-alt));
+}
+.badge--critical::before {
+  background: var(--color-severity-critical);
 }
 
 .badge--high {
-  color: #e53e3e;
-  background: rgba(229, 62, 62, 0.14);
+  border-left-color: var(--color-severity-high);
+  background: color-mix(in srgb, var(--color-severity-high) 14%, var(--color-surface-alt));
+}
+.badge--high::before {
+  background: var(--color-severity-high);
 }
 
 .badge--medium {
-  color: #dd6b20;
-  background: rgba(221, 107, 32, 0.14);
+  border-left-color: var(--color-severity-medium);
+  background: color-mix(in srgb, var(--color-severity-medium) 14%, var(--color-surface-alt));
+}
+.badge--medium::before {
+  background: var(--color-severity-medium);
 }
 
 .badge--low {
-  color: #d69e2e;
-  background: rgba(214, 158, 46, 0.16);
+  border-left-color: var(--color-severity-low);
+  background: color-mix(in srgb, var(--color-severity-low) 16%, var(--color-surface-alt));
+}
+.badge--low::before {
+  background: var(--color-severity-low);
 }
 
 .badge--info {
   color: var(--color-info);
   background: var(--color-info-bg);
 }
+.badge--info::before {
+  display: none;
+}
 
 .badge--type {
   color: var(--color-text-muted);
   background: var(--color-surface-alt);
 }
+.badge--type::before {
+  display: none;
+}
 
+/* Statuts de site : même logique que les badges de sévérité — texte neutre
+   (contraste garanti) + point de couleur, plutôt que du texte coloré sur
+   fond teinté qui échouait 4.5:1 en thème clair (ex. maintenance : 3.6:1). */
 .badge--status-active {
-  color: var(--color-low);
+  color: var(--color-text);
   background: var(--color-low-bg);
+}
+.badge--status-active::before {
+  background: var(--color-low);
 }
 
 .badge--status-inactive {
-  color: var(--color-info);
+  color: var(--color-text);
   background: var(--color-info-bg);
+}
+.badge--status-inactive::before {
+  background: var(--color-info);
 }
 
 .badge--status-maintenance {
-  color: var(--color-warning);
+  color: var(--color-text);
   background: var(--color-warning-bg);
+}
+.badge--status-maintenance::before {
+  background: var(--color-warning);
 }
 
 /* ---- Boutons / contrôles ---- */
@@ -303,10 +431,15 @@ button {
   background: var(--color-surface);
   border-radius: 6px;
   padding: 0.45rem 0.9rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 button:hover:not(:disabled) {
   background: var(--color-surface-alt);
+}
+
+button:active:not(:disabled) {
+  background: var(--color-border);
 }
 
 button:disabled {
@@ -320,6 +453,16 @@ button.primary {
   color: var(--color-primary-contrast);
 }
 
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--color-primary);
+}
+
+button.primary:active:not(:disabled) {
+  filter: brightness(0.94);
+  background: var(--color-primary);
+}
+
 select,
 input[type="text"],
 input[type="password"],
@@ -328,6 +471,14 @@ input[type="datetime-local"] {
   background: var(--color-surface);
   border-radius: 6px;
   padding: 0.4rem 0.6rem;
+  transition: border-color 0.15s ease;
+}
+
+select:hover,
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="datetime-local"]:hover {
+  border-color: var(--color-text-muted);
 }
 
 .theme-toggle {
@@ -345,25 +496,40 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.5rem;
+  padding: 0.55rem 0.5rem;
   border-bottom: 1px solid var(--color-border);
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
   color: var(--color-text-muted);
   font-weight: 600;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--color-border);
 }
 
 th.sortable {
   cursor: pointer;
   user-select: none;
+  transition: color 0.15s ease;
 }
 
 th.sortable:hover {
   color: var(--color-text);
+}
+
+/* Repérage rapide d'une ligne pendant un scroll de tableau dense. */
+tbody tr {
+  transition: background-color 0.1s ease;
+}
+
+tbody tr:hover {
+  background: var(--color-surface-alt);
 }
 
 /* ---- Filtres / pagination ---- */
@@ -400,6 +566,7 @@ th.sortable:hover {
 
 .stat-tile {
   border: 1px solid var(--color-border);
+  border-left: 3px solid var(--tile-accent, var(--color-border));
   background: var(--color-surface);
   border-radius: 8px;
   padding: 1rem;
@@ -407,12 +574,24 @@ th.sortable:hover {
   color: inherit;
   display: block;
   box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+.stat-tile:hover {
+  box-shadow: 0 2px 8px rgba(20, 20, 30, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Le nombre reste en --color-text (contraste garanti dans les deux thèmes) :
+   la sévérité se lit sur la bordure gauche de la tuile (--tile-accent,
+   posée en style inline par HomeView.vue via severityColor()), jamais sur
+   la couleur du chiffre — un chiffre "low" en #d69e2e sur fond clair
+   n'atteint pas 3:1. */
 .stat-tile__value {
   font-size: 1.8rem;
   font-weight: 700;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-tile__label {
