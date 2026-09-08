@@ -9,7 +9,7 @@ import MeasuresChart from "@/components/MeasuresChart.vue";
 import TimeRangeSelector from "@/components/TimeRangeSelector.vue";
 import { useLiveSocket } from "@/composables/useLiveSocket";
 import { SEVERITY_ORDER, severityColor } from "@/severity";
-import { rangeStartTime } from "@/timeRanges";
+import { rangeHours } from "@/timeRanges";
 
 // Les tuiles de résumé n'ont pas (encore) de flux temps réel dédié côté API :
 // un rafraîchissement discret reste nécessaire, mais bien plus espacé que
@@ -65,7 +65,15 @@ async function loadReadings() {
   try {
     const data = await fetchReadings({
       siteId: selectedSiteId.value,
-      startTime: rangeStartTime(timeRange.value),
+      // `rangeHours` : la fenêtre est calculée côté serveur, ancrée sur la
+      // donnée la plus récente réellement en base — immunise les périodes
+      // courtes (1h, 6h) contre un léger retard d'ingestion ou un décalage
+      // d'horloge entre l'ETL et l'API (voir app/routers/readings.py). Une
+      // fenêtre calculée ici depuis l'horloge du navigateur pouvait exclure
+      // toute donnée existante dès que ce retard dépassait la période
+      // choisie — "1h" apparaissait vide alors que "24h" montrait des
+      // données du jour même.
+      rangeHours: rangeHours(timeRange.value),
       limit: 1000,
     });
     if (token !== readingsToken) return;
@@ -103,10 +111,14 @@ function connectLive() {
       if (msg.type !== "reading" || msg.data.site_id !== selectedSiteId.value) return;
       // La fenêtre affichée glisse avec le temps : on écarte au passage les
       // points sortis de la période choisie, sinon la série grossit sans fin.
-      const floor = new Date(rangeStartTime(timeRange.value)).getTime();
-      readings.value = [...readings.value, msg.data].filter(
-        (reading) => new Date(reading.timestamp).getTime() >= floor,
-      );
+      // Ancré sur l'horodatage le plus récent des données elles-mêmes (pas
+      // sur l'horloge du navigateur, pour la même raison que côté serveur —
+      // voir loadReadings ci-dessus) : sans ça, un léger retard d'ingestion
+      // pouvait faire disparaître un point tout juste ajouté.
+      const next = [...readings.value, msg.data];
+      const newest = next.reduce((max, r) => Math.max(max, new Date(r.timestamp).getTime()), 0);
+      const floor = newest - rangeHours(timeRange.value) * 60 * 60 * 1000;
+      readings.value = next.filter((reading) => new Date(reading.timestamp).getTime() >= floor);
     },
   );
 }
