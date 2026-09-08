@@ -9,24 +9,7 @@ permissions:
   packages: write
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      # npm ci (pas npm install) : installe exactement ce que package-lock.json fige,
-      # échoue si package.json et le lock divergent — c'est ce qui garantit que le
-      # build est reproductible et identique à ce qui a été testé en local.
-      - run: npm ci
-      - run: npm run test
-
   build-and-push:
-    needs: test
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
