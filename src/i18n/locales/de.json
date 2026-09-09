@@ -1,0 +1,122 @@
+{
+  "app": {
+    "name": "Smart Energy Optimizer"
+  },
+  "nav": {
+    "home": "Startseite",
+    "sites": "Standorte",
+    "alerts": "Warnungen",
+    "predictions": "Vorhersagen",
+    "recommendations": "Empfehlungen"
+  },
+  "profile": {
+    "menu": "Profilmenü",
+    "theme_light": "Heller Modus",
+    "theme_dark": "Dunkler Modus",
+    "language": "Sprache",
+    "logout": "Abmelden"
+  },
+  "sidebar": {
+    "collapse": "Seitenleiste einklappen",
+    "expand": "Seitenleiste ausklappen"
+  },
+  "common": {
+    "loading": "Wird geladen…",
+    "error_generic": "Daten konnten nicht von der API geladen werden.",
+    "back": "Zurück",
+    "back_to_sites": "Zurück zu den Standorten",
+    "all": "Alle",
+    "all_severities": "Alle",
+    "all_sites": "Alle Standorte",
+    "from": "Von",
+    "to": "Bis",
+    "results": "Ergebnisse",
+    "page": "Seite",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "per_page": "Pro Seite",
+    "auto": "Automatisch",
+    "no_data": "Keine Daten für diese Auswahl.",
+    "reset_zoom": "Zoom zurücksetzen",
+    "coming_soon": "Demnächst verfügbar",
+    "coming_soon_detail": "Diese Funktion befindet sich in Entwicklung und wird bald verfügbar sein.",
+    "reset_filters": "Filter zurücksetzen",
+    "visible_period": "Angezeigter Zeitraum"
+  },
+  "severity": {
+    "critical": "Kritisch",
+    "high": "Hoch",
+    "medium": "Mittel",
+    "low": "Niedrig"
+  },
+  "status": {
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "maintenance": "Wartung"
+  },
+  "site_type": {
+    "office": "Büro",
+    "hospital": "Krankenhaus",
+    "datacenter": "Rechenzentrum",
+    "retail": "Einzelhandel",
+    "factory": "Fabrik"
+  },
+  "login": {
+    "title": "Smart Energy Optimizer - Anmeldung",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "submitting": "Anmeldung…",
+    "invalid": "Ungültige Anmeldedaten.",
+    "heading": "Anmeldung",
+    "subtitle": "Zugang zum Dashboard Ihrer Standorte.",
+    "tagline": "Überwachen Sie den Energieverbrauch Ihrer Standorte in Echtzeit."
+  },
+  "home": {
+    "title": "Übersicht",
+    "total_alerts": "Warnungen insgesamt",
+    "site": "Standort",
+    "metric": "Messwert",
+    "metric_consumption": "Verbrauch (kW)",
+    "metric_voltage": "Spannung (V)",
+    "metric_temperature": "Temperatur (°C)",
+    "metric_humidity": "Luftfeuchtigkeit (%)",
+    "period": "Zeitraum"
+  },
+  "sites": {
+    "title": "Standorte",
+    "capacity": "Kapazität"
+  },
+  "site_detail": {
+    "consumption_chart": "Verbrauch",
+    "recent_alerts": "Neueste Warnungen",
+    "see_all_alerts": "Alle Warnungen für diesen Standort anzeigen"
+  },
+  "alerts": {
+    "title": "Warnungen",
+    "severity": "Schweregrad",
+    "site": "Standort",
+    "message": "Nachricht",
+    "timestamp": "Zeitstempel",
+    "none": "Keine Warnungen für diese Filter.",
+    "chart_title": "Warnungen nach Schweregrad",
+    "chart_scale": "Achsenskala"
+  },
+  "predictions": {
+    "title": "Verbrauchsvorhersagen",
+    "site": "Standort",
+    "history": "Angezeigter Verlauf",
+    "horizon": "Vorhersagehorizont",
+    "measures_series": "Messwerte",
+    "forecast_series": "Vorhersage",
+    "generated_at": "Vorhersagen erstellt am {date}"
+  },
+  "recommendations": {
+    "title": "Empfehlungen",
+    "site": "Standort",
+    "status": "Status",
+    "status_open": "Offen",
+    "sort_by_date": "Nach Datum sortieren",
+    "none": "Keine Empfehlungen für diese Filter."
+  }
+}

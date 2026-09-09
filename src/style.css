@@ -1,0 +1,649 @@
+/* Thème clair par défaut, sombre via [data-theme="dark"] sur <html>
+   (voir composables/useTheme.js). Toutes les couleurs passent par ces
+   variables : aucune couleur en dur ailleurs dans les composants. */
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f0f1f4;
+  --color-border: #dde1e6;
+  --color-text: #1a1d21;
+  --color-text-muted: #5b6270;
+  --color-primary: #2f6feb;
+  --color-primary-contrast: #ffffff;
+  --color-critical: #d33;
+  --color-critical-bg: #fdeceb;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef5e2;
+  --color-low: #2f855a;
+  --color-low-bg: #e8f6ee;
+  --color-info: #5b6270;
+  --color-info-bg: #eef0f3;
+  --shadow-card: 0 1px 2px rgba(20, 20, 30, 0.06);
+
+  /* Anneau de focus clavier : distinct de --color-primary pour rester
+     visible même quand un élément focus est aussi en état "primary". */
+  --color-focus-ring: #0b57d0;
+
+  /* Palette de sévérité alignée sur src/severity.js (critical=violet,
+     high=rouge, medium=orange, low=jaune) — identique claire/sombre,
+     ce sont des couleurs de statut fixes, pas des couleurs de thème.
+     Teintes lumineuses (demande produit) : mêmes familles qu'avant, mais
+     plus saturées et plus claires, pour ressortir sur les fonds sombres
+     comme clairs des tuiles et des colonnes de graphique.
+     Ne pas modifier ces valeurs sans le faire aussi dans severity.js. */
+  --color-severity-critical: #8b5cf6;
+  --color-severity-high: #fb4d63;
+  --color-severity-medium: #f97316;
+  --color-severity-low: #f5c518;
+
+  /* Échelle de densité "dashboard" : espacements resserrés pour maximiser
+     la donnée visible à l'écran sans sacrifier la lisibilité. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #14161a;
+  --color-surface: #1c1f24;
+  --color-surface-alt: #23262c;
+  --color-border: #2c3038;
+  --color-text: #e7e9ec;
+  --color-text-muted: #9aa1ac;
+  --color-primary: #6ea2ff;
+  --color-primary-contrast: #0b1220;
+  --color-critical: #ff6b6b;
+  --color-critical-bg: #3a1f20;
+  --color-warning: #f0b34c;
+  --color-warning-bg: #3a2f16;
+  --color-low: #4fd18a;
+  --color-low-bg: #332a12;
+  --color-info: #9aa1ac;
+  --color-info-bg: #262a31;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  --color-focus-ring: #6ea2ff;
+}
+
+/* ---- Accessibilité : mouvement réduit ----
+   Coupe les transitions/animations décoratives pour les utilisateurs qui
+   l'ont demandé au niveau système, sans retirer les changements d'état
+   eux-mêmes (juste leur durée). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+body {
+  transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+/* ---- Focus clavier ----
+   Visible partout (contrôles natifs + liens/boutons), jamais supprimé.
+   :focus-visible évite l'anneau au clic souris tout en le gardant au
+   clavier/switch. */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Valeurs numériques (mesures, horodatages, compteurs) : chiffres de
+   largeur fixe pour que les colonnes de tableaux/tuiles ne "sautent" pas
+   d'une ligne à l'autre. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Layout général : sidebar fixe + topbar fixe + contenu qui scroll ---- */
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.app-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Le scroll d'une page longue reste dans .main-scroll : la sidebar et la
+   topbar (thème/déconnexion via ProfileMenu) restent toujours visibles,
+   plutôt que de défiler avec le contenu. */
+.main-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.topbar-brand {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  height: 100vh;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  transition: width 0.15s ease;
+}
+
+.sidebar--collapsed {
+  width: 68px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar--collapsed .sidebar-header {
+  flex-direction: column;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  padding: 0 0.25rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.sidebar-brand__logo {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  border-radius: 6px;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-collapse-toggle:hover {
+  background: var(--color-border);
+}
+
+.sidebar-collapse-toggle svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Menu replié : deux lettres à la place du libellé (les liens n'ont pas
+   d'icône), centrées pour rester alignées d'une entrée à l'autre. */
+.sidebar-link__short {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.sidebar--collapsed .sidebar-link {
+  justify-content: center;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.sidebar-link:hover {
+  background: var(--color-surface-alt);
+}
+
+.sidebar-link.router-link-exact-active {
+  background: var(--color-primary);
+  border-left-color: var(--color-primary-contrast);
+  color: var(--color-primary-contrast);
+  font-weight: 600;
+}
+
+/* ---- Cartes ---- */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card--critical {
+  border-color: var(--color-critical);
+  background: var(--color-critical-bg);
+}
+
+.card--degraded {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+/* ---- Badges de sévérité (utilisés par AlertsView / résumé d'accueil) ----
+   Le texte reste en --color-text (contraste garanti dans les deux thèmes) :
+   la sévérité se lit à un point de couleur + une bordure gauche, jamais à
+   la seule couleur du texte. Un badge critical/high/medium/low en texte
+   coloré sur fond teinté échouait le contraste 4.5:1 (ex. low : 2.4:1) —
+   voir src/severity.js pour les valeurs de couleur, inchangées ici. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.6rem 0.15rem 0.5rem;
+  border-radius: 999px;
+  border-left: 3px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+
+.badge::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: currentColor;
+}
+
+.badge--critical {
+  border-left-color: var(--color-severity-critical);
+  background: color-mix(in srgb, var(--color-severity-critical) 14%, var(--color-surface-alt));
+}
+.badge--critical::before {
+  background: var(--color-severity-critical);
+}
+
+.badge--high {
+  border-left-color: var(--color-severity-high);
+  background: color-mix(in srgb, var(--color-severity-high) 14%, var(--color-surface-alt));
+}
+.badge--high::before {
+  background: var(--color-severity-high);
+}
+
+.badge--medium {
+  border-left-color: var(--color-severity-medium);
+  background: color-mix(in srgb, var(--color-severity-medium) 14%, var(--color-surface-alt));
+}
+.badge--medium::before {
+  background: var(--color-severity-medium);
+}
+
+.badge--low {
+  border-left-color: var(--color-severity-low);
+  background: color-mix(in srgb, var(--color-severity-low) 16%, var(--color-surface-alt));
+}
+.badge--low::before {
+  background: var(--color-severity-low);
+}
+
+.badge--info {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+}
+.badge--info::before {
+  display: none;
+}
+
+.badge--type {
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+.badge--type::before {
+  display: none;
+}
+
+/* Statuts de site : même logique que les badges de sévérité — texte neutre
+   (contraste garanti) + point de couleur, plutôt que du texte coloré sur
+   fond teinté qui échouait 4.5:1 en thème clair (ex. maintenance : 3.6:1). */
+.badge--status-active {
+  color: var(--color-text);
+  background: var(--color-low-bg);
+}
+.badge--status-active::before {
+  background: var(--color-low);
+}
+
+.badge--status-inactive {
+  color: var(--color-text);
+  background: var(--color-info-bg);
+}
+.badge--status-inactive::before {
+  background: var(--color-info);
+}
+
+.badge--status-maintenance {
+  color: var(--color-text);
+  background: var(--color-warning-bg);
+}
+.badge--status-maintenance::before {
+  background: var(--color-warning);
+}
+
+/* Recommandation "open" (voir RecommendationsView) : même famille de couleur
+   que badge--status-maintenance (une action reste à traiter), point de
+   couleur + texte neutre pour le même motif de contraste que les badges
+   ci-dessus. */
+.badge--open {
+  color: var(--color-text);
+  background: var(--color-warning-bg);
+}
+.badge--open::before {
+  background: var(--color-warning);
+}
+
+/* ---- Boutons / contrôles ---- */
+button,
+select,
+input {
+  font: inherit;
+  color: var(--color-text);
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+}
+
+button:active:not(:disabled) {
+  background: var(--color-border);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--color-primary);
+}
+
+button.primary:active:not(:disabled) {
+  filter: brightness(0.94);
+  background: var(--color-primary);
+}
+
+select,
+input[type="text"],
+input[type="password"],
+input[type="datetime-local"] {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  transition: border-color 0.15s ease;
+}
+
+select:hover,
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="datetime-local"]:hover {
+  border-color: var(--color-text-muted);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ---- Tables ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+th.sortable:hover {
+  color: var(--color-text);
+}
+
+/* Repérage rapide d'une ligne pendant un scroll de tableau dense. */
+tbody tr {
+  transition: background-color 0.1s ease;
+}
+
+tbody tr:hover {
+  background: var(--color-surface-alt);
+}
+
+/* ---- Filtres / pagination ---- */
+.filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* ---- Stat tiles (page d'accueil) ---- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.stat-tile {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--tile-accent, var(--color-border));
+  background: var(--color-surface);
+  border-radius: 8px;
+  padding: 1rem;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.stat-tile:hover {
+  box-shadow: 0 2px 8px rgba(20, 20, 30, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Le nombre reste en --color-text (contraste garanti dans les deux thèmes) :
+   la sévérité se lit sur la bordure gauche de la tuile (--tile-accent,
+   posée en style inline par HomeView.vue via severityColor()), jamais sur
+   la couleur du chiffre — un chiffre "low" en #d69e2e sur fond clair
+   n'atteint pas 3:1. */
+.stat-tile__value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile__label {
+  margin-top: 0.35rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.chart-card {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+  width: 100%;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.chart-controls .filter-field {
+  font-size: 0.95rem;
+}
+
+.time-range-selector button {
+  padding: 0.4rem 0.7rem;
+}
+
+.error {
+  color: var(--color-critical);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}

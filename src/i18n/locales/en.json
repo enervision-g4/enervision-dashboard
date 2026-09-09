@@ -1,0 +1,122 @@
+{
+  "app": {
+    "name": "Smart Energy Optimizer"
+  },
+  "nav": {
+    "home": "Home",
+    "sites": "Sites",
+    "alerts": "Alerts",
+    "predictions": "Predictions",
+    "recommendations": "Recommendations"
+  },
+  "profile": {
+    "menu": "Profile menu",
+    "theme_light": "Light mode",
+    "theme_dark": "Dark mode",
+    "language": "Language",
+    "logout": "Log out"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error_generic": "Could not load data from the API.",
+    "back": "Back",
+    "back_to_sites": "Back to sites",
+    "all": "All",
+    "all_severities": "All",
+    "all_sites": "All sites",
+    "from": "From",
+    "to": "To",
+    "results": "results",
+    "page": "Page",
+    "previous": "Previous",
+    "next": "Next",
+    "per_page": "Per page",
+    "auto": "Automatic",
+    "no_data": "No data to display for this selection.",
+    "reset_zoom": "Reset zoom",
+    "coming_soon": "Coming soon",
+    "coming_soon_detail": "This feature is under development and will be available soon.",
+    "reset_filters": "Reset filters",
+    "visible_period": "Visible period"
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "maintenance": "Maintenance"
+  },
+  "site_type": {
+    "office": "Office",
+    "hospital": "Hospital",
+    "datacenter": "Data center",
+    "retail": "Retail",
+    "factory": "Factory"
+  },
+  "login": {
+    "title": "Smart Energy Optimizer - Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalid": "Invalid credentials.",
+    "heading": "Sign in",
+    "subtitle": "Access the dashboard for your sites.",
+    "tagline": "Monitor your sites' energy consumption in real time."
+  },
+  "home": {
+    "title": "Overview",
+    "total_alerts": "Total alerts",
+    "site": "Site",
+    "metric": "Metric",
+    "metric_consumption": "Consumption (kW)",
+    "metric_voltage": "Voltage (V)",
+    "metric_temperature": "Temperature (°C)",
+    "metric_humidity": "Humidity (%)",
+    "period": "Period"
+  },
+  "sites": {
+    "title": "Sites",
+    "capacity": "Capacity"
+  },
+  "site_detail": {
+    "consumption_chart": "Consumption",
+    "recent_alerts": "Recent alerts",
+    "see_all_alerts": "See all alerts for this site"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "severity": "Severity",
+    "site": "Site",
+    "message": "Message",
+    "timestamp": "Timestamp",
+    "none": "No alerts match these filters.",
+    "chart_title": "Alerts by severity",
+    "chart_scale": "Axis scale"
+  },
+  "predictions": {
+    "title": "Consumption predictions",
+    "site": "Site",
+    "history": "History shown",
+    "horizon": "Forecast horizon",
+    "measures_series": "Measures",
+    "forecast_series": "Forecast",
+    "generated_at": "Forecast generated on {date}"
+  },
+  "recommendations": {
+    "title": "Recommendations",
+    "site": "Site",
+    "status": "Status",
+    "status_open": "Open",
+    "sort_by_date": "Sort by date",
+    "none": "No recommendations match these filters."
+  }
+}
