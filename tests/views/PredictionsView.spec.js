@@ -71,7 +71,12 @@ describe("PredictionsView", () => {
     expect(fetchReadingsMock).toHaveBeenCalledWith(
       expect.objectContaining({ siteId: "SITE001", rangeHours: 24, limit: 1000 }),
     );
-    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 24 });
+    // Toujours HORIZON_ALL_LIMIT côté serveur, quel que soit l'horizon
+    // affiché : le découpage sur la fenêtre choisie se fait côté client
+    // (voir horizonWindow dans PredictionsView.vue) — un `limit` serveur basé
+    // sur l'horizon renvoyait les prévisions les plus ANCIENNES du site, pas
+    // les prochaines heures à venir.
+    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 1000 });
 
     const chart = wrapper.findComponent(MeasuresChartStub);
     expect(chart.props("series")).toEqual([
@@ -128,8 +133,48 @@ describe("PredictionsView", () => {
     await button48h.trigger("click");
     await flushPromises();
 
-    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 48 });
+    // Le `limit` envoyé au serveur ne dépend plus de l'horizon choisi (voir
+    // le commentaire du premier test) : seul le filtrage côté client change
+    // quand on sélectionne 48h.
+    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 1000 });
     expect(fetchReadingsMock).not.toHaveBeenCalled();
+  });
+
+  it("exclut les prévisions passées et celles au-delà de l'horizon sélectionné", async () => {
+    // Régression : GET /api/v1/predictions trie par target_timestamp
+    // croissant sur tout l'historique du site (latest_only ne retire pas les
+    // créneaux désormais passés) — sans filtrage côté client, un horizon
+    // précis (ex. 24h) affichait les prévisions les plus ANCIENNES jamais
+    // générées pour ce site plutôt que les prochaines heures à venir.
+    fetchPredictionsMock.mockResolvedValue([
+      // Périmée : cible antérieure à la dernière mesure connue (11h00).
+      {
+        target_timestamp: "2026-09-07T09:00:00Z",
+        predicted_consumption_kw: 40,
+        timestamp: "2026-09-07T08:05:00Z",
+        model_version: "v1",
+      },
+      // Dans la fenêtre de l'horizon par défaut (24h après 11h00).
+      {
+        target_timestamp: "2026-09-08T12:00:00Z",
+        predicted_consumption_kw: 65,
+        timestamp: "2026-09-08T11:05:00Z",
+        model_version: "v1",
+      },
+      // Au-delà de l'horizon par défaut.
+      {
+        target_timestamp: "2026-09-10T00:00:00Z",
+        predicted_consumption_kw: 70,
+        timestamp: "2026-09-08T11:05:00Z",
+        model_version: "v1",
+      },
+    ]);
+    const wrapper = mountView();
+    await flushPromises();
+
+    const chart = wrapper.findComponent(MeasuresChartStub);
+    const forecastSeries = chart.props("series")[1];
+    expect(forecastSeries.data).toEqual([{ x: "2026-09-08T12:00:00Z", y: 65 }]);
   });
 
   it("recharge les mesures et les prévisions du nouveau site quand on change de sélection", async () => {
@@ -145,7 +190,7 @@ describe("PredictionsView", () => {
     await wrapper.find("select").setValue("SITE002");
     await flushPromises();
 
-    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE002", limit: 24 });
+    expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE002", limit: 1000 });
     expect(fetchReadingsMock).toHaveBeenCalledWith(
       expect.objectContaining({ siteId: "SITE002" }),
     );

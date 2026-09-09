@@ -1,6 +1,6 @@
 # Tests et qualité
 
-## Outillage en place
+## Une vraie suite de tests, avec Vitest
 
 ```json
 "scripts": { "test": "vitest run", "test:watch": "vitest" },
@@ -11,42 +11,55 @@
 }
 ```
 
-`enervision-dashboard` est équipé pour tester ses composants Vue :
+`enervision-dashboard` est testé avec **Vitest** (cohérent avec Vite : même moteur de
+transformation, aucune configuration séparée à maintenir entre le build et les tests),
+**`@vue/test-utils`** pour monter les composants Vue et interagir avec eux, et **`jsdom`**
+pour simuler un DOM en Node.js. `npm test` (= `vitest run`) tourne dans la CI à chaque
+push.
 
-- **Vitest** comme lanceur de tests — cohérent avec Vite (même moteur de transformation,
-  pas de configuration séparée à maintenir entre le build et les tests).
-- **`jsdom`** simule un DOM en Node.js, nécessaire pour monter un composant Vue hors
-  navigateur.
-- **`@vue/test-utils`** est la bibliothèque officielle pour monter et interagir avec des
-  composants Vue en test (`mount()`, déclenchement d'événements, assertions sur le DOM
-  rendu).
+## Ce que couvre `tests/`
 
-À date, ce dossier ne contient pas encore de suite de tests écrite : l'outillage est
-posé et prêt à l'emploi (`npm test` fonctionne dès qu'un fichier `*.test.js` existe),
-mais la couverture reste à construire. C'est un point à mentionner tel quel plutôt qu'à
-maquiller — contrairement à `enervision-api`, dont
-[09-tests-et-qualite.md](../../enervision-api/docs/09-tests-et-qualite.md) documente une
-suite `pytest` déjà en place.
+| Fichier | Ce qu'il vérifie |
+|---|---|
+| `api/client.spec.js` | `resolveApiBaseUrl()` (ordre de priorité `window.APP_CONFIG` > `VITE_API_URL` > `/api-proxy`), injection du JWT, redirection sur 401. |
+| `composables/useAuth.spec.js` | Connexion/déconnexion, persistance du token en `localStorage`. |
+| `composables/useTheme.spec.js` | Bascule clair/sombre, persistance du choix. |
+| `components/AlertList.spec.js` | Affichage des alertes, et **une couleur de badge distincte par sévérité** (voir plus bas). |
+| `components/MeasuresChart.spec.js` | Le composant le plus testé (11 tests) : construction/patch du graphique, bornes d'axe, overlay "aucune donnée". |
+| `components/Pagination.spec.js` | Navigation page/limite. |
+| `components/SiteCard.spec.js` | Rendu d'une carte de site. |
+| `views/LoginView.spec.js` | Formulaire de connexion. |
+| `views/PredictionsView.spec.js` | Chargement mesures/prévisions, bornes du graphique, changement d'horizon/de site, et **le filtrage de la fenêtre de prévision** (voir plus bas). |
+| `views/RecommendationsView.spec.js` | Chargement paginé des recommandations. |
 
-## Ce qui vaudrait le plus la peine d'être testé en premier
+## Deux régressions couvertes par des tests ajoutés depuis
 
-Par ordre de valeur probable, si une suite de tests devait être amorcée :
+Deux défauts signalés par un opérateur du dashboard ont été corrigés, et chacun a reçu
+un test qui l'aurait détecté :
 
-- **`useLiveSocket`** (voir [06-temps-reel-websocket.md](06-temps-reel-websocket.md)) :
-  la logique de backoff exponentiel et de pause sur `visibilitychange` est pure logique
-  JS, testable sans monter de composant, avec un `WebSocket` simulé.
-- **`MeasuresChart.shapeKey()`** et la distinction reconstruction/patch (voir
-  [05-composants-cles.md](05-composants-cles.md)) : un test qui vérifie qu'un changement
-  de `rangeKey` force bien un rebuild, et qu'une simple extension de `series` ne fait
-  qu'un patch, protégerait contre une régression de performance silencieuse (un
-  graphique qui se remettrait à clignoter à chaque mesure temps réel).
-- **La garde de route** (`router/index.js`, voir
-  [03-authentification.md](03-authentification.md)) : vérifier qu'une route non publique
-  redirige bien vers `/login` avec le bon paramètre `redirect` en l'absence de token.
-- **`resolveApiBaseUrl()`** (voir
-  [07-configuration-et-build.md](07-configuration-et-build.md)) : vérifier l'ordre de
-  priorité `window.APP_CONFIG` > `VITE_API_URL` > `/api-proxy` avec différentes
-  combinaisons de globals/env simulées.
+- **`AlertList.spec.js`** — *"distingue visuellement chaque sévérité par sa propre
+  couleur de badge"*. Avant correction, `AlertList.vue` (utilisé pour les alertes
+  récentes d'un site, voir [04-navigation-et-vues.md](04-navigation-et-vues.md)) ne
+  distinguait que `critical` du reste : `high`, `medium` et `low` recevaient tous la
+  même classe CSS, donc la même couleur — faible et moyenne étaient visuellement
+  indiscernables. Le composant utilise désormais le même badge `badge--{severity}` que
+  le reste de l'application (voir [05-composants-cles.md](05-composants-cles.md)), et le
+  test vérifie explicitement que chaque sévérité porte sa propre classe.
+
+- **`PredictionsView.spec.js`** — *"exclut les prévisions passées et celles au-delà de
+  l'horizon sélectionné"*. `GET /api/v1/predictions` trie par `target_timestamp`
+  croissant sur **tout** l'historique de prévisions du site, y compris des créneaux
+  désormais passés (`latest_only` déduplique les runs successifs d'un même créneau, il
+  ne retire pas les créneaux échus). Demander un `limit` égal à l'horizon choisi (ex. 6
+  pour "6h") renvoyait donc les prévisions les plus **anciennes** jamais générées, pas
+  les prochaines heures à venir — un utilisateur pouvait voir une prévision datée de la
+  veille alors qu'il consultait le dashboard aujourd'hui. Le correctif récupère toujours
+  un lot large et découpe côté client sur une fenêtre ancrée sur la dernière mesure
+  connue (voir `horizonWindow()` dans
+  [06-temps-reel-websocket.md](06-temps-reel-websocket.md) n'en parle pas — voir plutôt
+  le composant lui-même, `src/views/PredictionsView.vue`) ; le test fournit des
+  prévisions volontairement hors fenêtre (une passée, une trop lointaine) et vérifie
+  qu'elles n'apparaissent pas dans la série tracée.
 
 ## Absence de linter configuré
 
