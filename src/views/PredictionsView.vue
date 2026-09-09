@@ -11,9 +11,8 @@ import { useLiveSocket } from "@/composables/useLiveSocket";
 import { rangeHours } from "@/timeRanges";
 
 // Choix proposés pour la longueur de l'horizon affiché : un nombre fixe
-// d'heures, ou "toutes" (limit au maximum accepté par l'API — voir
-// enervision-api GET /api/v1/predictions, le lot lui-même ne contenant de
-// toute façon jamais plus que ForecastSettings.horizon_hours par site).
+// d'heures à partir de maintenant, ou "toutes" (aucune borne haute — voir
+// horizonWindow ci-dessous pour comment cette fenêtre est appliquée).
 const HORIZON_HOUR_OPTIONS = [6, 12, 24, 48];
 const HORIZON_ALL_KEY = "all";
 const HORIZON_ALL_LIMIT = 1000;
@@ -36,8 +35,28 @@ const horizonOptions = computed(() => [
   { key: HORIZON_ALL_KEY, label: t("common.all") },
 ]);
 
-function horizonLimit() {
-  return horizonKey.value === HORIZON_ALL_KEY ? HORIZON_ALL_LIMIT : Number(horizonKey.value);
+/**
+ * Fenêtre temporelle de l'horizon sélectionné, ancrée sur la mesure la plus
+ * récente réellement en base (même logique que loadReadings — voir aussi
+ * app/routers/readings.py) plutôt que sur l'horloge du navigateur : rien ne
+ * garantit que enervision-ml ait déjà généré une prévision pile pour
+ * l'instant où le navigateur est ouvert.
+ *
+ * GET /api/v1/predictions trie par target_timestamp croissant sur TOUT
+ * l'historique de prévisions du site (latest_only ne déduplique que les
+ * runs successifs d'un même créneau, il ne retire pas les créneaux
+ * désormais passés) : demander un petit `limit` côté serveur (ex. 6 pour
+ * l'horizon "6h") renvoyait donc les 6 prévisions les plus ANCIENNES jamais
+ * générées pour ce site — potentiellement plusieurs jours dans le passé —
+ * au lieu des 6 prochaines heures à venir. On récupère donc toujours large
+ * (voir loadPredictions) et on découpe nous-mêmes sur cette fenêtre.
+ */
+function horizonWindow() {
+  const anchor = newestReadingTimestamp();
+  const startMs = anchor ? new Date(anchor).getTime() : Date.now();
+  if (horizonKey.value === HORIZON_ALL_KEY) return { startMs, endMs: undefined };
+  const hours = Number(horizonKey.value);
+  return { startMs, endMs: startMs + hours * 60 * 60 * 1000 };
 }
 
 // Bornes (ms epoch) de ce que couvrent réellement les mesures chargées — sert
@@ -133,19 +152,30 @@ async function loadReadings() {
 }
 
 // latest_only (défaut de l'API) : uniquement le dernier lot généré pour ce
-// site. `limit` vient du sélecteur d'horizon — 1000 ("Tout") dépasse déjà
-// largement ce qu'un lot peut contenir, ce qui revient à tout afficher.
+// site. On demande toujours large (HORIZON_ALL_LIMIT dépasse déjà largement
+// ce qu'un lot peut contenir) puis on découpe nous-mêmes sur la fenêtre de
+// l'horizon choisi (voir horizonWindow) — un `limit` serveur plus petit
+// aurait tronqué sur les prévisions les plus anciennes, pas les prochaines.
 async function loadPredictions() {
-  predictions.value = await fetchPredictions({
+  const all = await fetchPredictions({
     siteId: selectedSiteId.value,
-    limit: horizonLimit(),
+    limit: HORIZON_ALL_LIMIT,
+  });
+  const { startMs, endMs } = horizonWindow();
+  predictions.value = all.filter((p) => {
+    const targetMs = new Date(p.target_timestamp).getTime();
+    return targetMs >= startMs && (endMs === undefined || targetMs <= endMs);
   });
 }
 
 async function loadData() {
   loading.value = true;
   try {
-    await Promise.all([loadReadings(), loadPredictions()]);
+    // loadPredictions() ancre la fenêtre d'horizon sur la dernière mesure
+    // chargée (voir horizonWindow) : doit donc s'exécuter après
+    // loadReadings(), pas en parallèle avec elle.
+    await loadReadings();
+    await loadPredictions();
     applyForecastBound();
     loadError.value = "";
   } catch {
