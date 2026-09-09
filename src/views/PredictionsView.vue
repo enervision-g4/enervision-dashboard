@@ -11,9 +11,12 @@ import { useLiveSocket } from "@/composables/useLiveSocket";
 import { rangeHours } from "@/timeRanges";
 
 // Choix proposés pour la longueur de l'horizon affiché : un nombre fixe
-// d'heures à partir de maintenant, ou "toutes" (aucune borne haute — voir
-// horizonWindow ci-dessous pour comment cette fenêtre est appliquée).
-const HORIZON_HOUR_OPTIONS = [6, 12, 24, 48];
+// d'heures à partir de maintenant, ou "toutes" (l'intégralité de
+// l'historique de prévisions du site, passé compris — voir horizonWindow
+// ci-dessous pour comment cette fenêtre est appliquée). Pas de "48h" : le
+// service ML ne génère pas encore d'horizon aussi long, l'option n'aurait
+// jamais rien affiché de plus que "24h".
+const HORIZON_HOUR_OPTIONS = [6, 12, 24];
 const HORIZON_ALL_KEY = "all";
 const HORIZON_ALL_LIMIT = 1000;
 const DEFAULT_HORIZON_KEY = "24";
@@ -36,11 +39,20 @@ const horizonOptions = computed(() => [
 ]);
 
 /**
- * Fenêtre temporelle de l'horizon sélectionné, ancrée sur la mesure la plus
- * récente réellement en base (même logique que loadReadings — voir aussi
- * app/routers/readings.py) plutôt que sur l'horloge du navigateur : rien ne
- * garantit que enervision-ml ait déjà généré une prévision pile pour
+ * Fenêtre temporelle de l'horizon sélectionné.
+ *
+ * Pour un horizon précis (6h/12h/24h), la fenêtre est ancrée sur la mesure
+ * la plus récente réellement en base (même logique que loadReadings — voir
+ * aussi app/routers/readings.py) plutôt que sur l'horloge du navigateur :
+ * rien ne garantit que enervision-ml ait déjà généré une prévision pile pour
  * l'instant où le navigateur est ouvert.
+ *
+ * "Tous" (HORIZON_ALL_KEY) n'a volontairement AUCUNE borne, ni basse ni
+ * haute : contrairement aux horizons précis (qui ne regardent que vers
+ * l'avenir), "Tous" doit montrer l'intégralité de l'historique de
+ * prévisions enregistré pour ce site, y compris les créneaux désormais
+ * passés — utile pour comparer a posteriori une prévision à la mesure
+ * réelle qui a suivi.
  *
  * GET /api/v1/predictions trie par target_timestamp croissant sur TOUT
  * l'historique de prévisions du site (latest_only ne déduplique que les
@@ -52,9 +64,11 @@ const horizonOptions = computed(() => [
  * (voir loadPredictions) et on découpe nous-mêmes sur cette fenêtre.
  */
 function horizonWindow() {
+  if (horizonKey.value === HORIZON_ALL_KEY) {
+    return { startMs: undefined, endMs: undefined };
+  }
   const anchor = newestReadingTimestamp();
   const startMs = anchor ? new Date(anchor).getTime() : Date.now();
-  if (horizonKey.value === HORIZON_ALL_KEY) return { startMs, endMs: undefined };
   const hours = Number(horizonKey.value);
   return { startMs, endMs: startMs + hours * 60 * 60 * 1000 };
 }
@@ -66,8 +80,10 @@ function horizonWindow() {
 let loadedStartMs = null;
 let loadedEndMs = null;
 
-// Bornes explicites transmises à MeasuresChart (voir sa prop xMin/xMax) :
-// xMin suit le début de l'historique de mesures chargé ; xMax suit la fin de
+// Bornes explicites transmises à MeasuresChart (voir sa prop xMin/xMax),
+// entièrement recalculées par applyForecastBound() à chaque chargement :
+// xMin suit le début de l'historique de mesures chargé (ou d'une prévision
+// plus ancienne encore, avec l'horizon "Tous") ; xMax suit la fin de
 // l'horizon de prévision affiché (ou, à défaut de prévision, la fin des
 // mesures) — sans ça, Chart.js cadrait l'axe sur l'étendue réelle des points,
 // qui ne correspondait pas à la période/l'horizon choisis.
@@ -112,12 +128,27 @@ function rememberMeasuresBounds(data, requestedHours) {
   chartXMax.value = new Date(loadedEndMs).toISOString();
 }
 
-/** Étend la borne haute du graphique jusqu'à la fin de l'horizon de
- * prévision affiché, quand des prévisions sont chargées — sinon elle reste
- * celle des mesures (voir rememberMeasuresBounds). */
+/** Recalcule les bornes explicites du graphique à partir des mesures
+ * (`loadedStartMs`/`loadedEndMs`, jamais modifiées par les prévisions), puis
+ * les étend si les prévisions chargées vont plus loin : la borne haute
+ * jusqu'à la fin de l'horizon affiché, et — seulement pertinent pour "Tous"
+ * — la borne basse si des prévisions remontent plus loin dans le passé que
+ * l'historique de mesures chargé. Repartir systématiquement de
+ * loadedStartMs/loadedEndMs (plutôt que d'étendre chartXMin/chartXMax en
+ * place) évite qu'un passage par "Tous" laisse la borne basse élargie même
+ * après être revenu à un horizon précis. */
 function applyForecastBound() {
+  chartXMin.value = loadedStartMs === null ? undefined : new Date(loadedStartMs).toISOString();
+  chartXMax.value = loadedEndMs === null ? undefined : new Date(loadedEndMs).toISOString();
+  if (!predictions.value.length) return;
+
+  const first = predictions.value[0];
   const last = predictions.value[predictions.value.length - 1];
-  if (last) chartXMax.value = last.target_timestamp;
+  chartXMax.value = last.target_timestamp;
+  const firstMs = new Date(first.target_timestamp).getTime();
+  if (loadedStartMs === null || firstMs < loadedStartMs) {
+    chartXMin.value = first.target_timestamp;
+  }
 }
 
 /** Fusionne de nouvelles lignes dans `readings` (dédoublonnées par
@@ -164,7 +195,7 @@ async function loadPredictions() {
   const { startMs, endMs } = horizonWindow();
   predictions.value = all.filter((p) => {
     const targetMs = new Date(p.target_timestamp).getTime();
-    return targetMs >= startMs && (endMs === undefined || targetMs <= endMs);
+    return (startMs === undefined || targetMs >= startMs) && (endMs === undefined || targetMs <= endMs);
   });
 }
 
