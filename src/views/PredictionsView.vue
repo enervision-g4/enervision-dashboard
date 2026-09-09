@@ -167,7 +167,22 @@ function mergeReadings(rows) {
   }
 }
 
+// Jetons de requête : "Historique affiché" et "Horizon de prévision" sont
+// deux sélecteurs indépendants qui déclenchent chacun leur propre fetch
+// (voir les watchers plus bas) — enchaîner deux clics rapprochés sur l'un ou
+// l'autre lance deux requêtes en vol, sans garantie qu'elles se résolvent
+// dans l'ordre où elles ont été envoyées. Sans ce garde-fou, une réponse
+// plus lente pour un réglage déjà abandonné (ex. "7d" cliqué puis vite
+// changé pour "6h") pouvait arriver APRÈS la réponse du réglage actuel et
+// écraser readings/predictions avec des données périmées — les boutons
+// affichaient le bon filtre sélectionné, mais le graphique montrait les
+// données d'un réglage précédent. Même mécanisme que `readingsToken` dans
+// SiteDetailView.vue / `requestToken` dans RecommendationsView.vue.
+let readingsRequestToken = 0;
+let predictionsRequestToken = 0;
+
 async function loadReadings() {
+  const token = ++readingsRequestToken;
   // `rangeHours` : fenêtre calculée côté serveur, ancrée sur la donnée la
   // plus récente réellement en base (voir app/routers/readings.py et le même
   // commentaire dans HomeView.vue) — sinon un léger retard d'ingestion
@@ -178,6 +193,7 @@ async function loadReadings() {
     rangeHours: hours,
     limit: 1000,
   });
+  if (token !== readingsRequestToken) return; // Réponse périmée, voir plus haut.
   readings.value = data;
   rememberMeasuresBounds(data, hours);
 }
@@ -188,10 +204,12 @@ async function loadReadings() {
 // l'horizon choisi (voir horizonWindow) — un `limit` serveur plus petit
 // aurait tronqué sur les prévisions les plus anciennes, pas les prochaines.
 async function loadPredictions() {
+  const token = ++predictionsRequestToken;
   const all = await fetchPredictions({
     siteId: selectedSiteId.value,
     limit: HORIZON_ALL_LIMIT,
   });
+  if (token !== predictionsRequestToken) return; // Réponse périmée, voir plus haut.
   const { startMs, endMs } = horizonWindow();
   predictions.value = all.filter((p) => {
     const targetMs = new Date(p.target_timestamp).getTime();
@@ -228,6 +246,19 @@ async function onChartRangeChange({ min, max }) {
   const span = max - min;
   if (!(span > 0) || min - span * 0.5 >= loadedStartMs || extendingBefore) return;
 
+  // Capturé (sans l'incrémenter : cette extension est additive, pas
+  // autoritaire comme un chargement principal) pour vérifier après l'attente
+  // qu'aucun changement de filtre n'a entre-temps rendu cette extension
+  // obsolète. Sans ce garde-fou : glisser/zoomer déclenche cette extension,
+  // puis basculer rapidement "Historique affiché" vers un réglage plus
+  // court relance loadReadings() (readings.value proprement remplacé) — si
+  // CETTE extension met plus longtemps à répondre, son résultat arrivait
+  // ensuite et se fusionnait quand même dans readings.value via
+  // mergeReadings (additif, jamais un remplacement) : plusieurs semaines de
+  // mesures anciennes réapparaissaient alors, reliées au segment récent par
+  // une ligne traversant tout le vide entre les deux (mergeReadings ne
+  // comble aucun trou, Chart.js relie simplement les points consécutifs).
+  const token = readingsRequestToken;
   extendingBefore = true;
   const targetStart = new Date(min - span).toISOString();
   const targetEnd = new Date(loadedStartMs).toISOString();
@@ -238,6 +269,7 @@ async function onChartRangeChange({ min, max }) {
       endTime: targetEnd,
       limit: 1000,
     });
+    if (token !== readingsRequestToken) return; // Un autre chargement a eu lieu entretemps : cette extension est périmée.
     mergeReadings(older);
     loadedStartMs = Math.min(loadedStartMs, new Date(targetStart).getTime());
   } catch {

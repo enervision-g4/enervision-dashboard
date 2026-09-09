@@ -143,6 +143,54 @@ describe("PredictionsView", () => {
     expect(fetchReadingsMock).not.toHaveBeenCalled();
   });
 
+  it("ignore une extension d'historique (glissement) devenue périmée par un nouveau chargement", async () => {
+    // Régression : glisser/zoomer sur le graphique déclenche onChartRangeChange,
+    // qui charge un historique plus ancien et le FUSIONNE dans `readings`
+    // (contrairement à loadReadings, qui remplace). Si cette extension met
+    // plus longtemps à répondre qu'un changement de filtre "Historique
+    // affiché" survenu entretemps, son résultat (potentiellement vieux de
+    // plusieurs semaines) se fusionnait quand même après coup — le graphique
+    // montrait alors un mélange incohérent malgré un filtre "propre"
+    // sélectionné.
+    const wrapper = mountView();
+    await flushPromises();
+    fetchReadingsMock.mockClear();
+
+    // L'extension par glissement part en premier, mais sa réponse reste en
+    // suspens (on la résout nous-mêmes, plus tard).
+    let resolveExtension;
+    const extensionPromise = new Promise((resolve) => {
+      resolveExtension = resolve;
+    });
+    fetchReadingsMock.mockImplementationOnce(() => extensionPromise);
+
+    const loadedStartMs = new Date(READINGS[0].timestamp).getTime();
+    const span = 60 * 60 * 1000; // 1h
+    const chart = wrapper.findComponent(MeasuresChartStub);
+    chart.vm.$emit("range-change", { min: loadedStartMs - span, max: loadedStartMs });
+    await flushPromises();
+
+    // Avant que l'extension ne réponde, l'utilisateur change de filtre :
+    // un nouveau chargement principal part, et doit remplacer proprement
+    // `readings` dès qu'il répond.
+    const FRESH_READING = { timestamp: "2026-09-08T11:30:00Z", consumption_kw: 70 };
+    fetchReadingsMock.mockResolvedValueOnce([FRESH_READING]);
+    const historiqueButtons = wrapper.findAll(".time-range-selector")[0].findAll("button");
+    const button6h = historiqueButtons.find((b) => b.text() === "6h");
+    await button6h.trigger("click");
+    await flushPromises();
+
+    // L'extension répond enfin, avec de vieilles données : elle doit être
+    // ignorée puisqu'un chargement plus récent a eu lieu entretemps.
+    resolveExtension([{ timestamp: "2026-08-06T00:00:00Z", consumption_kw: 999 }]);
+    await flushPromises();
+
+    const finalChart = wrapper.findComponent(MeasuresChartStub);
+    expect(finalChart.props("series")[0].data).toEqual([
+      { x: FRESH_READING.timestamp, y: FRESH_READING.consumption_kw },
+    ]);
+  });
+
   it("exclut les prévisions passées et celles au-delà de l'horizon sélectionné", async () => {
     // Régression : GET /api/v1/predictions trie par target_timestamp
     // croissant sur tout l'historique du site (latest_only ne retire pas les
