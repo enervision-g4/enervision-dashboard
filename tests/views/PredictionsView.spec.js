@@ -127,15 +127,18 @@ describe("PredictionsView", () => {
 
     // TimeRangeSelector rend un groupe de boutons, pas un <select> — deux
     // instances coexistent (historique de mesures, horizon de prévision), la
-    // seconde étant celle de l'horizon (voir l'ordre dans le template).
+    // seconde étant celle de l'horizon (voir l'ordre dans le template). Pas
+    // de "48h" (voir HORIZON_HOUR_OPTIONS dans PredictionsView.vue : le
+    // service ML ne génère pas encore d'horizon aussi long) — "12h" suffit à
+    // vérifier qu'un changement d'horizon ne recharge que les prévisions.
     const horizonButtons = wrapper.findAll(".time-range-selector")[1].findAll("button");
-    const button48h = horizonButtons.find((b) => b.text() === "48h");
-    await button48h.trigger("click");
+    const button12h = horizonButtons.find((b) => b.text() === "12h");
+    await button12h.trigger("click");
     await flushPromises();
 
     // Le `limit` envoyé au serveur ne dépend plus de l'horizon choisi (voir
     // le commentaire du premier test) : seul le filtrage côté client change
-    // quand on sélectionne 48h.
+    // quand on sélectionne 12h.
     expect(fetchPredictionsMock).toHaveBeenCalledWith({ siteId: "SITE001", limit: 1000 });
     expect(fetchReadingsMock).not.toHaveBeenCalled();
   });
@@ -175,6 +178,39 @@ describe("PredictionsView", () => {
     const chart = wrapper.findComponent(MeasuresChartStub);
     const forecastSeries = chart.props("series")[1];
     expect(forecastSeries.data).toEqual([{ x: "2026-09-08T12:00:00Z", y: 65 }]);
+  });
+
+  it("\"Tous\" affiche l'intégralité de l'historique de prévisions, y compris les créneaux passés", async () => {
+    // Régression : contrairement à un horizon précis (qui ne regarde que
+    // vers l'avenir), "Tous" doit montrer chaque prévision enregistrée pour
+    // le site, passé compris — utile pour comparer une prévision à la
+    // mesure réelle qui a suivi.
+    const PAST = {
+      target_timestamp: "2026-09-07T09:00:00Z",
+      predicted_consumption_kw: 40,
+      timestamp: "2026-09-07T08:05:00Z",
+      model_version: "v1",
+    };
+    fetchPredictionsMock.mockResolvedValue([PAST, ...PREDICTIONS]);
+    const wrapper = mountView();
+    await flushPromises();
+    fetchPredictionsMock.mockClear();
+
+    const horizonButtons = wrapper.findAll(".time-range-selector")[1].findAll("button");
+    const buttonAll = horizonButtons.find((b) => b.text() === "Tous");
+    await buttonAll.trigger("click");
+    await flushPromises();
+
+    const chart = wrapper.findComponent(MeasuresChartStub);
+    const forecastSeries = chart.props("series")[1];
+    expect(forecastSeries.data).toEqual([
+      { x: PAST.target_timestamp, y: PAST.predicted_consumption_kw },
+      { x: "2026-09-08T12:00:00Z", y: 65 },
+      { x: "2026-09-08T13:00:00Z", y: 66 },
+    ]);
+    // La borne basse du graphique s'étend jusqu'à cette prévision passée,
+    // sinon elle existerait dans les données sans jamais être visible.
+    expect(chart.props("xMin")).toBe(PAST.target_timestamp);
   });
 
   it("recharge les mesures et les prévisions du nouveau site quand on change de sélection", async () => {
