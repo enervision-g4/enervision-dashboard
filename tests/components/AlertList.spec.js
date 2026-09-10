@@ -29,13 +29,25 @@ describe("AlertList", () => {
     expect(wrapper.text()).toContain("SITE002");
   });
 
-  it("distingue visuellement les alertes critiques des autres (classe CSS)", () => {
+  it("distingue visuellement chaque sévérité par sa propre couleur de badge", () => {
+    // Régression : faible et moyenne rendaient toutes les deux la même
+    // classe "card--degraded" (donc la même couleur), seule "critical" se
+    // distinguait du reste. Chaque sévérité doit maintenant porter le badge
+    // badge--{severity} (mêmes couleurs que AlertsView/HomeView, voir
+    // src/severity.js et src/style.css).
     const wrapper = mount(AlertList, {
-      props: { alerts: [alert, { ...alert, alert_id: "ALR-2", severity: "medium" }] },
+      props: {
+        alerts: [
+          alert,
+          { ...alert, alert_id: "ALR-2", severity: "medium" },
+          { ...alert, alert_id: "ALR-3", severity: "low" },
+        ],
+      },
     });
 
     const items = wrapper.findAll("li");
-    expect(items[0].classes()).toContain("card--critical");
-    expect(items[1].classes()).toContain("card--degraded");
+    expect(items[0].find(".badge").classes()).toContain("badge--critical");
+    expect(items[1].find(".badge").classes()).toContain("badge--medium");
+    expect(items[2].find(".badge").classes()).toContain("badge--low");
   });
 });
